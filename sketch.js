@@ -75,10 +75,10 @@ function mousePressed() {
 
 // base color like mondrian
 let colors = {
-  gray: '#d6d7d2',
-  yellow: '#e1c927',
-  red: '#ad372b',
-  blue: '#314294',
+  gray: '#000000ff',
+  yellow: '#000000ff',
+  red: '#000000ff',
+  blue: '#000000ff',
   bg: '#EBEAE6'
 };
 
@@ -285,7 +285,7 @@ function feltifyRect(g, x, y, w, h, c, ampScale = 1) {
   g.rect(x, y, w, h);
 
   // slight shaking
-  const amp = 0.36 * ampScale;     
+  const amp = 0.25 * ampScale;     
   const freq = 0.1;   
   const layers = 6;     
 

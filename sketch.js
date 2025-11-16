@@ -75,10 +75,10 @@ function mousePressed() {
 
 // base color like mondrian
 let colors = {
-  gray: '#000000ff',
-  yellow: '#000000ff',
-  red: '#000000ff',
-  blue: '#000000ff',
+  C1: '#000000ff',
+  C2: '#000000ff',
+  C3: '#000000ff',
+  C4: '#000000ff',
   bg: '#EBEAE6'
 };
 
@@ -193,21 +193,21 @@ function chooseColor(grid, row, col) {
   const avoid = [];
   
   // Check top neighbor（&& is like and in python）
-  if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== colors.yellow) {
+  if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== colors.C2) {
     avoid.push(grid[row - 1][col]);
   }
   
   // Check left neighbor  
-  if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== colors.yellow) {
+  if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== colors.C2) {
     avoid.push(grid[row][col - 1]);
   }
   
   // color weights
   const weights = [
-    { color: colors.gray, weight: 10 },
-    { color: colors.yellow, weight: 60 },
-    { color: colors.red, weight: 10 },
-    { color: colors.blue, weight: 20 }
+    { color: colors.C1, weight: 10 },
+    { color: colors.C2, weight: 60 },
+    { color: colors.C3, weight: 10 },
+    { color: colors.C4, weight: 20 }
   ];
   
   // filter out avoided colors

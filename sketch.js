@@ -204,7 +204,7 @@ function generateArt() {
 }
 
 // Build one long non-overlapping path on the road network
-// Idea: use DFS + backtracking to try to visit as many road cells as possible
+// Idea: use DFS + backtracking to try to visit as many road cells as possible since the audio is long
 function buildAnimationPath() {
   animationPath = [];
   if (!roadGrid || gridRows === 0 || gridCols === 0) return;
@@ -233,7 +233,6 @@ function buildAnimationPath() {
     return count;
   }
 
-  // Find a reasonable start cell:
   // try a cell with only 1 road neighbor first (an "end" of a corridor),
   // fall back to any road cell if none
   let start = null;

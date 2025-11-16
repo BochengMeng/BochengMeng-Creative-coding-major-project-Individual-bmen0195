@@ -21,9 +21,21 @@ let roadGrid = []; // grid showing where roads are
 let gridRows = 0;
 let gridCols = 0;
 
+// path animation
+let pathT = 0; // position on the path (float index)
+// const PATH_SPEED = 0.35; 
+let basePathSpeed = 0.20; // base speed
+let boostPathSpeed = 1.20; // volume controled speed
+
+// audio controls
+let soundTrack; // the audio file
+let amplitude; // p5.Amplitude to measure loudness
+let lastLevel = 0; // smoothed loudness
+
 function preload() {
   sourceImage = loadImage('Street.png');
   // load image https://p5js.org/reference/p5/preload/
+  soundTrack = loadSound('mix_2m27s (audio-joiner.com).mp3'); 
 }
 
 function setup() {
@@ -34,6 +46,11 @@ function setup() {
   // create graphics buffer for art generation
   artCanvas = createGraphics(600, 600);
   artCanvas.pixelDensity(1); // https://p5js.org/reference/p5/loadPixels/ // Get the pixel density.
+
+  // init audio amplitude
+  amplitude = new p5.Amplitude();
+  amplitude.setInput(soundTrack);
+
   generateArt();
   ready = true;
   scaleToWindow(); // scale to window size

@@ -20,7 +20,7 @@ let v2Blocks = []; // black blocks (V2)
 let pathT = 0; // current position along the path (float index)
 let basePathSpeed = 0.1; // base speed, will be updated in startAnimation()
 let boostPathSpeed = 0.4; // extra speed based on audio loudness
-let speedScale = 0.25; // global speed control
+let speedScale = 0.28; // global speed control
 
 let animationPath = []; // ordered list of blocks for the animation
 let cellToIndex = []; // map from grid cell to v1Blocks index
@@ -142,8 +142,8 @@ function updateAnimation() {
   }
 
   // smooth the loudness so it does not jump too hard
-  let smoothFactor = 0.15; // smaller = more smooth
-  lastLevel = lerp(lastLevel, level, smoothFactor);
+  // （改动：不再平滑，直接使用当前音量值）
+  lastLevel = level;
 
   // if the audio loudness is below this threshold, the animation should completely stop (no movement).
   const silenceThreshold = 0.02; 
@@ -179,9 +179,10 @@ function renderArt() {
   // First draw the large square layer
   drawSVGBlocks();
   // V2 black base layer (always fully visible)
-  v2Blocks.forEach(block => {
-    feltifyRect(artCanvas, block.x, block.y, block.w, block.h, block.color, 1.2); // V2 feltifyRect
-  });
+  for (let i = 0; i < v2Blocks.length; i++) {
+  const block = v2Blocks[i];
+  feltifyRect(artCanvas, block.x, block.y, block.w, block.h, block.color, 1.2);
+}
   // V1 colored layer (only draw blocks that have been revealed)
   const limit = Math.min(animationProgress, animationPath.length);
   for (let i = 0; i < limit; i++) {
@@ -225,7 +226,9 @@ function generateArt() {
 
   // ---------------------V2-------------------------------------------------------
   // track which cells are roads
-  roadGrid = Array(rows).fill().map(() => Array(cols).fill(false));
+  roadGrid = Array(rows).fill().map(function () {
+  return Array(cols).fill(false);
+});
   // V2 sampling - simplified since all blocks are black
   for (let y = 0, row = 0; y < sourceImage.height; y += SAMPLE_STEP, row++) {
     for (let x = 0, col = 0; x < sourceImage.width; x += SAMPLE_STEP, col++) {
@@ -250,8 +253,12 @@ function generateArt() {
 
   // ---------------------V1-------------------------------------------------------
   // V1 grid
-  const gridV1 = Array(rows).fill().map(() => Array(cols).fill(null));
-  cellToIndex = Array(rows).fill().map(() => Array(cols).fill(null));
+  const gridV1 = Array(rows).fill().map(function () {
+  return Array(cols).fill(null);
+});
+  cellToIndex = Array(rows).fill().map(function () {
+  return Array(cols).fill(null);
+});
 
   // V1 sampling
   for (let y = 0, row = 0; y < sourceImage.height; y += SAMPLE_STEP, row++) {
@@ -365,14 +372,15 @@ let currentPath = [];
 
     // heuristic: visit tighter corridors first
     // (cells with fewer unvisited neighbors)
-    neighbors.sort((a, b) => {
-      const da = roadDegree(a.row, a.col);
-      const db = roadDegree(b.row, b.col);
-      return da - db;
-    });
-    for (let n of neighbors) {
-      dfs(n.row, n.col);
-    }
+neighbors.sort(function (a, b) {
+  const da = roadDegree(a.row, a.col);
+  const db = roadDegree(b.row, b.col);
+  return da - db;
+});
+
+for (let n of neighbors) {
+  dfs(n.row, n.col);
+}
     // backtrack so other branches can reuse this cell in other attempts
     currentPath.pop();
     visited[row][col] = false;
@@ -411,30 +419,53 @@ function countRoadNeighbors(r, c) {
   return count;
 }
 
-// Mondrian-style big blocks
+// Mondrian-style big blocks with audio-reactive scaling
 function drawSVGBlocks() {
   const g = artCanvas;
   g.noStroke();
-  const s = 1600 / 600; //cal canvas scale
-  function R(x, y, w, h, c) {
-    // ampScale = 0.6 for smoother edge // update：change to 6, since they are much bigger than the small ones.
+
+  // layout is in a 1600 x 1600 design space
+  const s = 1600 / 600; 
+
+
+  // Map the current audio level (lastLevel) to 0–1
+  const ampNorm = constrain(map(lastLevel, 0, 0.3, 0, 1, true), 0, 1);
+  const center = (ampNorm - 0.5) * 2.0;
+
+  const MAX_SCALE_RATIO = 0.2; // how much blocks can grow or shrink
+
+  function R(x, y, w, h, c, dir = 1) {
+    const delta = center * MAX_SCALE_RATIO * dir;
+    const scaleFactor = 1 + delta;
+
+    // Scale around the center: update size and shift position by half the change
+    const wScaled = w * scaleFactor;
+    const hScaled = h * scaleFactor;
+    const dx = (wScaled - w) / 2;
+    const dy = (hScaled - h) / 2;
+
     feltifyRect(
       g,
-      Math.round(x / s),
-      Math.round(y / s),
-      Math.round(w / s),
-      Math.round(h / s),
+      Math.round((x - dx) / s),
+      Math.round((y - dy) / s),
+      Math.round(wScaled / s),
+      Math.round(hScaled / s),
       c,
-      6
+      6 // these blocks are much bigger than the grid cells, so keep ampScale at 6
     );
   }
-  R(910, 305, 275, 420, '#4267ba'); R(910, 390, 275, 230, '#ad372b'); R(960, 450, 160, 100, '#e1c927'); R(80, 1160, 160, 140, '#e1c927');
-  R(230, 960, 150, 130, "#4267ba"); R(1450, 1450, 165, 165, '#e1c927'); R(730, 280, 95, 95, '#e1c927'); R(385, 1300, 195, 310, '#ad372b');
-  R(450, 1360, 60, 60, '#d6d7d2'); R(1005, 1060, 175, 390, "#4267ba"); R(1025, 1295, 125, 100, '#e1c927'); R(150, 455, 225, 120, "#4267ba");
-  R(280, 160, 205, 85, '#ad372b'); R(1380, 70, 180, 120, "#4267ba"); R(1400, 625, 210, 210, '#ad372b'); R(1270, 865, 130, 190, '#e1c927');
-  R(610, 945, 215, 215, '#e1c927'); R(385, 740, 220, 90, '#ad372b'); R(830, 730, 155, 155, '#ad372b'); R(1470, 700, 80, 60, '#d6d7d2');
-  R(280, 1000, 50, 50, '#d6d7d2'); R(670, 1020, 80, 80, '#d6d7d2'); R(340, 160, 40, 85, '#d6d7d2'); R(1295, 915, 75, 75, '#d6d7d2'); 
+
+  // 1: louder audio = bigger block
+  // -1: louder audio = smaller block (inverse reaction)
+  // 0：no move
+  R(910, 305, 275, 420, '#4267ba', 0); R(910, 390, 275, 230, '#ad372b', 0); R(960, 450, 160, 100, '#e1c927', 1); R(80, 1160, 160, 140, '#e1c927', -1);
+  R(230, 960, 150, 130, "#4267ba", 0); R(1450, 1450, 165, 165, '#e1c927', 1); R(730, 280, 95, 95, '#e1c927', -1); R(385, 1300, 195, 310, '#ad372b', 0);
+  R(450, 1360, 60, 60, '#d6d7d2', -1); R(1005, 1060, 175, 390, "#4267ba", 0); R(1025, 1295, 125, 100, '#e1c927', -1); R(150, 455, 225, 120, "#4267ba", 0);
+  R(280, 160, 205, 85, '#ad372b', 0); R(1380, 70, 180, 120, "#4267ba", 0); R(1400, 625, 210, 210, '#ad372b', 0); R(1270, 865, 130, 190, '#e1c927', 1);
+  R(610, 945, 215, 215, '#e1c927',  -1); R(385, 740, 220, 90, '#ad372b', 0); R(830, 730, 155, 155, '#ad372b', 0); R(1470, 700, 80, 60, '#d6d7d2', 1);
+  R(280, 1000, 50, 50, '#d6d7d2', -1); R(670, 1020, 80, 80, '#d6d7d2', 1); R(340, 160, 40, 85, '#d6d7d2', -1); R(1295, 915, 75, 75, '#d6d7d2', 1);
 }
+
 
 // (V1) choose color with probability and neighbor checking （like in mondian's work）
 function chooseColorV1(grid, row, col) {

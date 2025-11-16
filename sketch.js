@@ -388,9 +388,9 @@ function feltifyRect(g, x, y, w, h, c, ampScale = 1) {
  g.rect(x, y, w, h);
 
  // slight shaking
- const amp = 0.25 * ampScale;    
+ const amp = 0.20 * ampScale;    
  const freq = 0.1;  
- const layers = 6;   
+ const layers = 5;   
 
  for (let l = 0; l < layers; l++) {
   g.noFill();

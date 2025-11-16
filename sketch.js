@@ -20,7 +20,7 @@ let v2Blocks = []; // black blocks (V2)
 let pathT = 0; // current position along the path (float index)
 let basePathSpeed = 0.1; // base speed, will be updated in startAnimation()
 let boostPathSpeed = 0.4; // extra speed based on audio loudness
-let speedScale = 0.4; 
+let speedScale = 0.25; // global speed control
 
 let animationPath = []; // ordered list of blocks for the animation
 let cellToIndex = []; // map from grid cell to v1Blocks index
@@ -37,7 +37,7 @@ let lastLevel = 0;  // smoothed loudness value
 function preload() {
   sourceImage = loadImage('Street.png');
   // load image https://p5js.org/reference/p5/preload/
-  soundTrack = loadSound('mix_2m27s (audio-joiner.com).mp3'); 
+  soundTrack = loadSound('mix2.mp3'); 
 }
 
 function setup() {
@@ -145,6 +145,12 @@ function updateAnimation() {
   let smoothFactor = 0.15; // smaller = more smooth
   lastLevel = lerp(lastLevel, level, smoothFactor);
 
+  // if the audio loudness is below this threshold, the animation should completely stop (no movement).
+  const silenceThreshold = 0.02; 
+  if (lastLevel < silenceThreshold) {
+    return;
+  }
+
   // map the loudness to an extra speed (boost)
   let mappedBoost = map(
     lastLevel, 0, 0.3, 0, boostPathSpeed, true
@@ -155,7 +161,7 @@ function updateAnimation() {
   pathT += currentSpeed;
   animationProgress = floor(pathT);
 
-  // 5check if we reached the end of the path
+  // check if we reached the end of the path
   if (animationProgress >= totalBlocks - 1) {
     animationProgress = totalBlocks - 1;
     pathT = totalBlocks - 1;

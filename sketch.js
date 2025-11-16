@@ -254,17 +254,17 @@ function buildAnimationPath() {
   let bestPathCoords = [];
   let currentPath = [];
 
-  // Depth-first search with backtracking
+  // depth-first search with backtracking
   function dfs(row, col) {
     visited[row][col] = true;
     currentPath.push({ row, col });
 
-    // Save the best (longest) path seen so far
+    // save the best (longest) path seen so far
     if (currentPath.length > bestPathCoords.length) {
       bestPathCoords = currentPath.slice();
     }
 
-    // Collect unvisited neighbor road cells
+    // collect unvisited neighbor road cells
     let neighbors = [];
     for (let d of directions) {
       const nr = row + d.dr;
@@ -279,7 +279,7 @@ function buildAnimationPath() {
       }
     }
 
-    // Heuristic: visit tighter corridors first
+    // heuristic: visit tighter corridors first
     // (cells with fewer unvisited neighbors)
     neighbors.sort((a, b) => {
       const da = roadDegree(a.row, a.col);
@@ -291,15 +291,15 @@ function buildAnimationPath() {
       dfs(n.row, n.col);
     }
 
-    // Backtrack so other branches can reuse this cell in other attempts
+    // backtrack so other branches can reuse this cell in other attempts
     currentPath.pop();
     visited[row][col] = false;
   }
 
-  // Run the DFS from the chosen start cell
+  // run the DFS from the chosen start cell
   dfs(start.row, start.col);
 
-  // Turn grid coordinates into actual v1Blocks for drawing
+  // turn grid coordinates into actual v1Blocks for drawing
   animationPath = [];
   for (let k = 0; k < bestPathCoords.length; k++) {
     const { row, col } = bestPathCoords[k];

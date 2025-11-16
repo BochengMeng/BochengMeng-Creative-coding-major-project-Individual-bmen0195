@@ -215,8 +215,7 @@ function chooseColor(grid, row, col) {
     return !avoid.includes(w.color);
   });
   
-  // default to yellow if no colors available（since the original work has lots of yellow）
-  if (available.length === 0) return colors.yellow;
+  if (available.length === 0) return colors.C2;
   
   // calculate total weight
   const total = available.reduce(function(sum, w) {

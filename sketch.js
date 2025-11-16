@@ -44,7 +44,6 @@ function setup() {
 }
 
 function draw() {
-
   //resizing and fitting
   background(255);
   let zoom = 1.25;
@@ -126,14 +125,8 @@ function renderArt() {
   artCanvas.pop();
 }
 
-// base color like mondrian (V2 - Black lines)
-let colors = {
-  C1: '#000000ff',
-  C2: '#000000ff',
-  C3: '#000000ff',
-  C4: '#000000ff',
-  bg: '#EBEAE6'
-};
+// V2 - simplified to just black
+const BLACK_COLOR = '#000000ff';
 
 // V1 colored lines
 let colorsV1 = {
@@ -146,7 +139,6 @@ let colorsV1 = {
 
 // new generateArt，prepare all V2 and V1 blocks (store as data, not directly draw)
 function generateArt() {
-
   // clear previous blocks
   v1Blocks = [];
   v2Blocks = [];
@@ -165,10 +157,7 @@ function generateArt() {
 
   // ---------------------V2-------------------------------------------------------
 
-  // V2 grid
-  const gridV2 = Array(rows).fill().map(() => Array(cols).fill(null));
-
-  // V2 sampling
+  // V2 sampling - simplified since all blocks are black
   for (let y = 0, row = 0; y < sourceImage.height; y += SAMPLE_STEP, row++) {
     for (let x = 0, col = 0; x < sourceImage.width; x += SAMPLE_STEP, col++) {
       // Get pixel color
@@ -179,13 +168,12 @@ function generateArt() {
 
       // Check if it's a road pixel (white color)
       if (r > 240 && g > 240 && b > 240) {
-        gridV2[row][col] = chooseColor(gridV2, row, col); // V2 chooseColor
         v2Blocks.push({
           x: x * scaleX,
           y: y * scaleY,
           w: blockSize,
           h: blockSize,
-          color: gridV2[row][col]
+          color: BLACK_COLOR // Always black for V2
         });
       }
     }
@@ -277,54 +265,7 @@ function drawSVGBlocks() {
   R(750, 305, 45, 45, '#d6d7d2');
 }
 
-// (V2) choose color with probability and neighbor checking （like in mondian’s work）
-function chooseColor(grid, row, col) {
-  const avoid = [];
-
-  // Check top neighbor（&& is like and in python）
-  if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== colors.C2) {
-    avoid.push(grid[row - 1][col]);
-  }
-
-  // Check left neighbor
-  if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== colors.C2) {
-    avoid.push(grid[row][col - 1]);
-  }
-
-  // color weights
-  const weights = [
-    { color: colors.C1, weight: 10 },
-    { color: colors.C2, weight: 60 },
-    { color: colors.C3, weight: 10 },
-    { color: colors.C4, weight: 20 }
-  ];
-
-  // filter out avoided colors
-  const available = weights.filter(function (w) {
-    return !avoid.includes(w.color);
-  });
-
-  if (available.length === 0) return colors.C2;
-
-  // calculate total weight
-  const total = available.reduce(function (sum, w) {
-    return sum + w.weight;
-  }, 0);
-
-  // weighted random selection
-  let rand = random(total);
-
-  for (let i = 0; i < available.length; i++) {
-    if (rand < available[i].weight) {
-      return available[i].color;
-    }
-    rand -= available[i].weight;
-  }
-
-  return available[0].color;
-}
-
-// (V1) choose color with probability and neighbor checking （like in mondian’s work）
+// (V1) choose color with probability and neighbor checking （like in mondian's work）
 function chooseColorV1(grid, row, col) {
   const avoid = [];
 
@@ -399,7 +340,6 @@ function drawBackground(shadowOffsetX = 0, shadowOffsetY = 0) {
   rect(0, 985, 1920, 50);
 
   // layered rectangles to create a shadow effect
-
   fill('#A88974'); // deepest shadow (move)
   rect(630 + shadowOffsetX * 0.6, 132 + shadowOffsetY * 0.6, 670, 677);
 
@@ -415,7 +355,6 @@ function drawBackground(shadowOffsetX = 0, shadowOffsetY = 0) {
 
 // ------------------(V2) Hand-drawn style in visuals---------------------------
 function feltifyRect(g, x, y, w, h, c, ampScale = 1) {
-
   // Draw the main color block
   g.noStroke();
   g.fill(c);
@@ -473,7 +412,6 @@ function feltifyRect(g, x, y, w, h, c, ampScale = 1) {
 
 // -------------------(V1) Hand-drawn style in visuals-----------------
 function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
-
   // Draw the main color block
   g.noStroke();
   g.fill(c);

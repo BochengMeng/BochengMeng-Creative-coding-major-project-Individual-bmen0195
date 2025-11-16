@@ -547,7 +547,6 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
       const offset = map(n, 0, 1, -amp, amp);
       g.vertex(constrain(x + offset, x - amp, x + amp), y + i * h);
     }
-
     g.endShape(CLOSE);
   }
 
@@ -562,7 +561,6 @@ function scaleToWindow() {
   let scaleX = windowWidth / baseWidth;
   let scaleY = windowHeight / baseHeight;
   let scale = Math.max(scaleX, scaleY);
-
   let canvasElement = document.querySelector('canvas');
   canvasElement.style.position = "absolute";
   canvasElement.style.left = "50%";

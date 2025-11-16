@@ -203,17 +203,15 @@ function generateArt() {
   totalBlocks = animationPath.length;
 }
 
-// Build one long non-overlapping path on the road network
 // Idea: use DFS + backtracking to try to visit as many road cells as possible since the audio is long
 function buildAnimationPath() {
   animationPath = [];
   if (!roadGrid || gridRows === 0 || gridCols === 0) return;
-
   const directions = [
-    { dr: 0, dc: 1 },   // right
-    { dr: 1, dc: 0 },   // down
-    { dr: 0, dc: -1 },  // left
-    { dr: -1, dc: 0 }   // up
+    { dr: 0, dc: 1 }, // right
+    { dr: 1, dc: 0 }, // down
+    { dr: 0, dc: -1 }, // left
+    { dr: -1, dc: 0 }  // up
   ];
 
   // Count how many road neighbors a cell has (ignoring visited)
@@ -250,20 +248,26 @@ function buildAnimationPath() {
   }
   if (!start) return;
 
-  const visited = Array(gridRows).fill(0).map(() => Array(gridCols).fill(false));
-  let bestPathCoords = [];
-  let currentPath = [];
-
+// 2D array for visited flags
+let visited = [];
+for (let r = 0; r < gridRows; r++) {
+  visited[r] = [];
+  for (let c = 0; c < gridCols; c++) {
+    visited[r][c] = false; // not visited at the start
+  }
+}
+// store the best (longest) path we have found so far
+let bestPathCoords = [];
+// store the current path during DFS
+let currentPath = [];
   // depth-first search with backtracking
   function dfs(row, col) {
     visited[row][col] = true;
     currentPath.push({ row, col });
-
     // save the best (longest) path seen so far
     if (currentPath.length > bestPathCoords.length) {
       bestPathCoords = currentPath.slice();
     }
-
     // collect unvisited neighbor road cells
     let neighbors = [];
     for (let d of directions) {
@@ -286,19 +290,15 @@ function buildAnimationPath() {
       const db = roadDegree(b.row, b.col);
       return da - db;
     });
-
     for (let n of neighbors) {
       dfs(n.row, n.col);
     }
-
     // backtrack so other branches can reuse this cell in other attempts
     currentPath.pop();
     visited[row][col] = false;
   }
-
   // run the DFS from the chosen start cell
   dfs(start.row, start.col);
-
   // turn grid coordinates into actual v1Blocks for drawing
   animationPath = [];
   for (let k = 0; k < bestPathCoords.length; k++) {
@@ -308,7 +308,6 @@ function buildAnimationPath() {
       animationPath.push(v1Blocks[idx]);
     }
   }
-
   totalBlocks = animationPath.length;
 }
 
@@ -370,9 +369,9 @@ function chooseColorV1(grid, row, col) {
   }
   // color weights
   const weights = [
-    { color: colorsV1.gray, weight: 10 },
-    { color: colorsV1.yellow, weight: 60 },
-    { color: colorsV1.red, weight: 10 },
+    { color: colorsV1.gray, weight: 15 },
+    { color: colorsV1.yellow, weight: 45 },
+    { color: colorsV1.red, weight: 20 },
     { color: colorsV1.blue, weight: 20 }
   ];
   // filter out avoided colors
@@ -435,7 +434,7 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
   // slight shaking
   const amp = 0.20 * ampScale;
   const freq = 0.1;
-  const layers = 1; // change to 1 to refine the rendering speed
+  const layers = 2; // change to 2 to refine the rendering speed
   for (let l = 0; l < layers; l++) {
     g.noFill();
     g.stroke(red(c), green(c), blue(c), map(l, 0, layers - 1, 100, 50));

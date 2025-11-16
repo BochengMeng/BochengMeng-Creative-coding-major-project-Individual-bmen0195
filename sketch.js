@@ -217,7 +217,6 @@ function generateArt() {
       }
     }
   }
-
   // build a continuous path through the road network
   buildAnimationPath();
   totalBlocks = animationPath.length;
@@ -226,7 +225,6 @@ function generateArt() {
 // build a continuous path through connected road cells
 function buildAnimationPath() {
   animationPath = [];
-
   if (!roadGrid || gridRows === 0 || gridCols === 0) return;
   // find an endpoint to start (cell with only 1 neighbor)
   let start = null;
@@ -245,24 +243,20 @@ function buildAnimationPath() {
     if (start) break;
   }
   if (!start) return; // no roads found
-
   // track visited cells
   const visited = Array(gridRows).fill().map(() => Array(gridCols).fill(false));
   let current = start;
   let previous = null;
-
   // follow the road network
   while (current) {
     const { row, col } = current;
     if (!roadGrid[row][col] || visited[row][col]) break;
     visited[row][col] = true;
-
     // add this cell's block to the animation path
     const idx = cellToIndex[row][col];
     if (idx !== null && idx !== undefined) {
       animationPath.push(v1Blocks[idx]);
     }
-
     // find unvisited neighbors
     const neighbors = [];
     const directions = [
@@ -271,7 +265,6 @@ function buildAnimationPath() {
       { dr: 0, dc: -1 }, // left
       { dr: -1, dc: 0 }  // up
     ];
-
     for (let d of directions) {
       const newRow = row + d.dr;
       const newCol = col + d.dc;
@@ -284,11 +277,9 @@ function buildAnimationPath() {
         neighbors.push({ row: newRow, col: newCol });
       }
     }
-
     if (neighbors.length === 0) {
       break; // dead end, path complete
     }
-
     // try to keep going straight if possible
     let next = null;
     if (previous) {
@@ -343,7 +334,6 @@ function drawSVGBlocks() {
       6
     );
   }
-
   R(910, 305, 275, 420, '#4267ba');
   R(910, 390, 275, 230, '#ad372b');
   R(960, 450, 160, 100, '#e1c927');
@@ -374,17 +364,14 @@ function drawSVGBlocks() {
 // (V1) choose color with probability and neighbor checking （like in mondian's work）
 function chooseColorV1(grid, row, col) {
   const avoid = [];
-
   // Check top neighbor（&& is like and in python）
   if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== colorsV1.yellow) {
     avoid.push(grid[row - 1][col]);
   }
-
   // Check left neighbor
   if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== colorsV1.yellow) {
     avoid.push(grid[row][col - 1]);
   }
-
   // color weights
   const weights = [
     { color: colorsV1.gray, weight: 10 },
@@ -392,7 +379,6 @@ function chooseColorV1(grid, row, col) {
     { color: colorsV1.red, weight: 10 },
     { color: colorsV1.blue, weight: 20 }
   ];
-
   // filter out avoided colors
   const available = weights.filter(function (w) {
     return !avoid.includes(w.color);

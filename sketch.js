@@ -9,17 +9,18 @@ const baseHeight = 1080; // base canvas height
 const SAMPLE_STEP = 25;
 const UNIT_SIZE = 30;
 
-// --------- animation ---------
+// --------------------------- animation ------------------------------------------
 let isAnimating = false;
 let animationProgress = 0;
 let totalBlocks = 0;
 let v1Blocks = []; // colored blocks (V1)
 let v2Blocks = []; // black blocks (V2)
 
-// --------- path animation (controlled by audio) ---------
+// ----------------------------- path animation (controlled by audio) ------------------------
 let pathT = 0; // current position along the path (float index)
-let basePathSpeed = 0.20; // base speed, will be updated in startAnimation()
-let boostPathSpeed = 1.20; // extra speed based on audio loudness
+let basePathSpeed = 0.1; // base speed, will be updated in startAnimation()
+let boostPathSpeed = 0.4; // extra speed based on audio loudness
+let speedScale = 0.4; 
 
 let animationPath = []; // ordered list of blocks for the animation
 let cellToIndex = []; // map from grid cell to v1Blocks index
@@ -27,7 +28,7 @@ let roadGrid = []; // grid showing where roads are (true/false)
 let gridRows = 0;
 let gridCols = 0;
 
-// --------- audio controls ---------
+// ------------------- audio controls ------------------------------------------
 let soundTrack; // the audio file
 let amplitude; // p5.Amplitude to measure loudness
 let lastLevel = 0;  // smoothed loudness value
@@ -141,17 +142,14 @@ function updateAnimation() {
   }
 
   // smooth the loudness so it does not jump too hard
-  const smoothFactor = 0.15; // smaller = more smooth
+  let smoothFactor = 0.15; // smaller = more smooth
   lastLevel = lerp(lastLevel, level, smoothFactor);
 
   // map the loudness to an extra speed (boost)
-  const mappedBoost = map(
-    lastLevel,
-    0, 0.3,          // loudness range we care about
-    0, boostPathSpeed,
-    true
+  let mappedBoost = map(
+    lastLevel, 0, 0.3, 0, boostPathSpeed, true
   );
-  const currentSpeed = basePathSpeed + mappedBoost;
+  let currentSpeed = (basePathSpeed + mappedBoost) * speedScale;
 
   // move forward along the path using the current speed
   pathT += currentSpeed;

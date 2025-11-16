@@ -397,26 +397,6 @@ for (let n of neighbors) {
   totalBlocks = animationPath.length;
 }
 
-// count how many road neighbors a cell has
-function countRoadNeighbors(r, c) {
-  let count = 0;
-  const directions = [
-    { dr: 0, dc: 1 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: -1, dc: 0 }
-  ];
-  for (let d of directions) {
-    const newRow = r + d.dr;
-    const newCol = c + d.dc;
-    if (
-      newRow >= 0 && newRow < gridRows &&
-      newCol >= 0 && newCol < gridCols &&
-      roadGrid[newRow][newCol]
-    ) {
-      count++;
-    }
-  }
-  return count;
-}
-
 // Mondrian-style big blocks with audio-reactive scaling
 function drawSVGBlocks() {
   const g = artCanvas;

@@ -141,8 +141,6 @@ function updateAnimation() {
     level = amplitude.getLevel();
   }
 
-  // smooth the loudness so it does not jump too hard
-  // （改动：不再平滑，直接使用当前音量值）
   lastLevel = level;
 
   // if the audio loudness is below this threshold, the animation should completely stop (no movement).

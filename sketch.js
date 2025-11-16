@@ -1,36 +1,37 @@
 let sourceImage;
-let artCanvas; // define artCanvas
-let ready = false; // track if art is ready
+let artCanvas; 
+let ready = false;
+
 const baseWidth = 1920; // base canvas width
 const baseHeight = 1080; // base canvas height
-// sampling parameters to control the size and ignore the imperfection of the map image
+
+// sampling parameters to simplify the map image
 const SAMPLE_STEP = 25;
 const UNIT_SIZE = 30;
-// animation controls
+
+// --------- animation ---------
 let isAnimating = false;
 let animationProgress = 0;
 let totalBlocks = 0;
-let v1Blocks = [];
-let v2Blocks = [];
-// path animation stuff
-let pathT = 0; // position on the path (float index)
-const PATH_SPEED = 0.35; // how fast the animation moves
-let animationPath = []; // the actual path for animation
-let cellToIndex = []; // maps grid position to v1Blocks index
-let roadGrid = []; // grid showing where roads are
+let v1Blocks = []; // colored blocks (V1)
+let v2Blocks = []; // black blocks (V2)
+
+// --------- path animation (controlled by audio) ---------
+let pathT = 0; // current position along the path (float index)
+let basePathSpeed = 0.20; // base speed, will be updated in startAnimation()
+let boostPathSpeed = 1.20; // extra speed based on audio loudness
+
+let animationPath = []; // ordered list of blocks for the animation
+let cellToIndex = []; // map from grid cell to v1Blocks index
+let roadGrid = []; // grid showing where roads are (true/false)
 let gridRows = 0;
 let gridCols = 0;
 
-// path animation
-let pathT = 0; // position on the path (float index)
-// const PATH_SPEED = 0.35; 
-let basePathSpeed = 0.20; // base speed
-let boostPathSpeed = 1.20; // volume controled speed
-
-// audio controls
+// --------- audio controls ---------
 let soundTrack; // the audio file
 let amplitude; // p5.Amplitude to measure loudness
-let lastLevel = 0; // smoothed loudness
+let lastLevel = 0;  // smoothed loudness value
+
 
 function preload() {
   sourceImage = loadImage('Street.png');
@@ -83,29 +84,87 @@ function draw() {
 function mousePressed() {
   startAnimation();
 }
+
 // reset and start the reveal
 function startAnimation() {
-  if (animationPath.length === 0) return; // no path, no animation
+  // if there is no path, do nothing
+  if (animationPath.length === 0) return;
+
+  // reset animation state
   isAnimating = true;
   animationProgress = 0;
   totalBlocks = animationPath.length;
-  pathT = 0; // animation starts at beginning of path
+  pathT = 0; // start at the beginning of the path
+
+  // control the audio
+  if (soundTrack) {
+    // if the sound is already playing, stop it first
+    if (soundTrack.isPlaying()) {
+      soundTrack.stop();
+    }
+    // play from the start
+    soundTrack.play();
+  }
+
+  // set a base speed so the animation roughly matches the audio length
+  if (soundTrack && soundTrack.isLoaded() && totalBlocks > 0) {
+    const duration = soundTrack.duration(); // total audio length in seconds
+
+    // try to get the current frame rate
+    let fps = frameRate();
+    if (!isFinite(fps) || fps <= 0) {
+      fps = 60; // fallback if frameRate is not ready
+    }
+
+    const framesTotal = duration * fps;
+
+    // target speed: if we only use this speed,
+    // the path will finish around the end of the audio
+    const targetBaseSpeed = totalBlocks / framesTotal;
+
+    // use 70% of that speed to leave room for audio-based boost
+    basePathSpeed = targetBaseSpeed * 0.7;
+
+    // keep the base speed in a safe range
+    basePathSpeed = constrain(basePathSpeed, 0.02, 1.5);
+  }
 }
 
-// update animation progress
 function updateAnimation() {
+  // if there is no path, do nothing
   if (animationPath.length === 0) return;
-  // animation moves forward smoothly
-  pathT += PATH_SPEED;
-  // blocks appear progressively
+
+  // get current loudness level from the audio
+  let level = 0;
+  if (amplitude) {
+    level = amplitude.getLevel();
+  }
+
+  // smooth the loudness so it does not jump too hard
+  const smoothFactor = 0.15; // smaller = more smooth
+  lastLevel = lerp(lastLevel, level, smoothFactor);
+
+  // map the loudness to an extra speed (boost)
+  const mappedBoost = map(
+    lastLevel,
+    0, 0.3,          // loudness range we care about
+    0, boostPathSpeed,
+    true
+  );
+  const currentSpeed = basePathSpeed + mappedBoost;
+
+  // move forward along the path using the current speed
+  pathT += currentSpeed;
   animationProgress = floor(pathT);
-  // check if we reached the end
+
+  // 5check if we reached the end of the path
   if (animationProgress >= totalBlocks - 1) {
     animationProgress = totalBlocks - 1;
     pathT = totalBlocks - 1;
-    isAnimating = false; // animation complete
+    isAnimating = false;
   }
 }
+
 
 // draw two layers（V2 base, V1 on top, partially revealed）
 function renderArt() {

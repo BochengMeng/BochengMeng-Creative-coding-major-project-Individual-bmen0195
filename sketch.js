@@ -203,85 +203,121 @@ function generateArt() {
   totalBlocks = animationPath.length;
 }
 
-// build a continuous path through connected road cells
+// Build one long non-overlapping path on the road network
+// Idea: use DFS + backtracking to try to visit as many road cells as possible
 function buildAnimationPath() {
   animationPath = [];
   if (!roadGrid || gridRows === 0 || gridCols === 0) return;
-  // find an endpoint to start (cell with only 1 neighbor)
+
+  const directions = [
+    { dr: 0, dc: 1 },   // right
+    { dr: 1, dc: 0 },   // down
+    { dr: 0, dc: -1 },  // left
+    { dr: -1, dc: 0 }   // up
+  ];
+
+  // Count how many road neighbors a cell has (ignoring visited)
+  function roadDegree(row, col) {
+    let count = 0;
+    for (let d of directions) {
+      const nr = row + d.dr;
+      const nc = col + d.dc;
+      if (
+        nr >= 0 && nr < gridRows &&
+        nc >= 0 && nc < gridCols &&
+        roadGrid[nr][nc]
+      ) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // Find a reasonable start cell:
+  // try a cell with only 1 road neighbor first (an "end" of a corridor),
+  // fall back to any road cell if none
   let start = null;
   for (let r = 0; r < gridRows; r++) {
     for (let c = 0; c < gridCols; c++) {
-      if (!roadGrid[r][c]) continue;
-      const neighbors = countRoadNeighbors(r, c);
-      if (neighbors === 1) {
+      if (roadGrid[r][c] && roadDegree(r, c) === 1) {
         start = { row: r, col: c };
         break;
       }
-      // if no endpoints, just use any road cell
-      if (!start) start = { row: r, col: c };
+      if (!start && roadGrid[r][c]) {
+        start = { row: r, col: c };
+      }
     }
     if (start) break;
   }
-  if (!start) return; // no roads found
-  // track visited cells
-  const visited = Array(gridRows).fill().map(() => Array(gridCols).fill(false));
-  let current = start;
-  let previous = null;
-  // follow the road network
-  while (current) {
-    const { row, col } = current;
-    if (!roadGrid[row][col] || visited[row][col]) break;
+  if (!start) return;
+
+  const visited = Array(gridRows).fill(0).map(() => Array(gridCols).fill(false));
+  let bestPathCoords = [];
+  let currentPath = [];
+
+  // Depth-first search with backtracking
+  function dfs(row, col) {
     visited[row][col] = true;
-    // add this cell's block to the animation path
+    currentPath.push({ row, col });
+
+    // Save the best (longest) path seen so far
+    if (currentPath.length > bestPathCoords.length) {
+      bestPathCoords = currentPath.slice();
+    }
+
+    // Collect unvisited neighbor road cells
+    let neighbors = [];
+    for (let d of directions) {
+      const nr = row + d.dr;
+      const nc = col + d.dc;
+      if (
+        nr >= 0 && nr < gridRows &&
+        nc >= 0 && nc < gridCols &&
+        roadGrid[nr][nc] &&
+        !visited[nr][nc]
+      ) {
+        neighbors.push({ row: nr, col: nc });
+      }
+    }
+
+    // Heuristic: visit tighter corridors first
+    // (cells with fewer unvisited neighbors)
+    neighbors.sort((a, b) => {
+      const da = roadDegree(a.row, a.col);
+      const db = roadDegree(b.row, b.col);
+      return da - db;
+    });
+
+    for (let n of neighbors) {
+      dfs(n.row, n.col);
+    }
+
+    // Backtrack so other branches can reuse this cell in other attempts
+    currentPath.pop();
+    visited[row][col] = false;
+  }
+
+  // Run the DFS from the chosen start cell
+  dfs(start.row, start.col);
+
+  // Turn grid coordinates into actual v1Blocks for drawing
+  animationPath = [];
+  for (let k = 0; k < bestPathCoords.length; k++) {
+    const { row, col } = bestPathCoords[k];
     const idx = cellToIndex[row][col];
     if (idx !== null && idx !== undefined) {
       animationPath.push(v1Blocks[idx]);
     }
-    // find unvisited neighbors
-    const neighbors = [];
-    const directions = [
-      { dr: 0, dc: 1 },  // right
-      { dr: 1, dc: 0 },  // down
-      { dr: 0, dc: -1 }, // left
-      { dr: -1, dc: 0 }  // up
-    ];
-    for (let d of directions) {
-      const newRow = row + d.dr;
-      const newCol = col + d.dc;
-      if (
-        newRow >= 0 && newRow < gridRows &&
-        newCol >= 0 && newCol < gridCols &&
-        roadGrid[newRow][newCol] &&
-        !visited[newRow][newCol]
-      ) {
-        neighbors.push({ row: newRow, col: newCol });
-      }
-    }
-    if (neighbors.length === 0) {
-      break; // dead end, path complete
-    }
-    // try to keep going straight if possible
-    let next = null;
-    if (previous) {
-      const dirRow = row - previous.row;
-      const dirCol = col - previous.col;
-      // look for neighbor in same direction
-      next = neighbors.find(n => (n.row - row === dirRow && n.col - col === dirCol));
-    }
-    if (!next) next = neighbors[0]; // if can't go straight, just pick one
-    previous = current;
-    current = next;
   }
+
+  totalBlocks = animationPath.length;
 }
 
 // count how many road neighbors a cell has
 function countRoadNeighbors(r, c) {
   let count = 0;
   const directions = [
-    { dr: 0, dc: 1 },
-    { dr: 1, dc: 0 },
-    { dr: 0, dc: -1 },
-    { dr: -1, dc: 0 }
+    { dr: 0, dc: 1 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: -1, dc: 0 }
   ];
   for (let d of directions) {
     const newRow = r + d.dr;
@@ -319,7 +355,7 @@ function drawSVGBlocks() {
   R(450, 1360, 60, 60, '#d6d7d2'); R(1005, 1060, 175, 390, "#4267ba"); R(1025, 1295, 125, 100, '#e1c927'); R(150, 455, 225, 120, "#4267ba");
   R(280, 160, 205, 85, '#ad372b'); R(1380, 70, 180, 120, "#4267ba"); R(1400, 625, 210, 210, '#ad372b'); R(1270, 865, 130, 190, '#e1c927');
   R(610, 945, 215, 215, '#e1c927'); R(385, 740, 220, 90, '#ad372b'); R(830, 730, 155, 155, '#ad372b'); R(1470, 700, 80, 60, '#d6d7d2');
-  R(280, 1000, 50, 50, '#d6d7d2'); R(670, 1020, 80, 80, '#d6d7d2'); R(340, 160, 40, 85, '#d6d7d2'); R(1295, 915, 75, 75, '#d6d7d2'); R(750, 305, 45, 45, '#d6d7d2');
+  R(280, 1000, 50, 50, '#d6d7d2'); R(670, 1020, 80, 80, '#d6d7d2'); R(340, 160, 40, 85, '#d6d7d2'); R(1295, 915, 75, 75, '#d6d7d2'); 
 }
 
 // (V1) choose color with probability and neighbor checking （like in mondian's work）
@@ -382,50 +418,12 @@ function drawBackground() {
 
 // ------------------(V2) Hand-drawn style in visuals---------------------------
 function feltifyRect(g, x, y, w, h, c, ampScale = 1) {
-  // Draw the main color block
   g.noStroke();
   g.fill(c);
   g.rect(x, y, w, h);
-  // slight shaking
-  const amp = 0.20 * ampScale;
-  const freq = 0.1;
-  const layers = 5;
-  for (let l = 0; l < layers; l++) {
-    g.noFill();
-    g.stroke(red(c), green(c), blue(c), map(l, 0, layers - 1, 100, 50));
-    g.strokeWeight(map(l, 0, layers - 1, 2.2, 1));
-    g.beginShape();
-    // up
-    for (let i = 0; i <= 1; i += 0.02) {
-      const n = noise((x + i * w) * freq, (y + l * 50) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(x + i * w, constrain(y + offset, y - amp, y + amp));
-    }
-    // right
-    for (let i = 0; i <= 1; i += 0.02) {
-      const n = noise((x + w + l * 20) * freq, (y + i * h) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(constrain(x + w + offset, x + w - amp, x + w + amp), y + i * h);
-    }
-    // down
-    for (let i = 1; i >= 0; i -= 0.02) {
-      const n = noise((x + i * w) * freq, (y + h + l * 40) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(x + i * w, constrain(y + h + offset, y + h - amp, y + h + amp));
-    }
-    // left
-    for (let i = 1; i >= 0; i -= 0.02) {
-      const n = noise((x + l * 30) * freq, (y + i * h) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(constrain(x + offset, x - amp, x + amp), y + i * h);
-    }
-    g.endShape(CLOSE);
-  }
-
-  // soft glow outline
-  g.stroke(red(c), green(c), blue(c), 40);
-  g.strokeWeight(3);
   g.noFill();
+  g.stroke(red(c), green(c), blue(c), 180);
+  g.strokeWeight(2);
   g.rect(x, y, w, h);
 }
 
@@ -438,7 +436,7 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
   // slight shaking
   const amp = 0.20 * ampScale;
   const freq = 0.1;
-  const layers = 6;
+  const layers = 1; // change to 1 to refine the rendering speed
   for (let l = 0; l < layers; l++) {
     g.noFill();
     g.stroke(red(c), green(c), blue(c), map(l, 0, layers - 1, 100, 50));

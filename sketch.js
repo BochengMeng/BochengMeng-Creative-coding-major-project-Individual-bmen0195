@@ -17,7 +17,7 @@ let v1Blocks = []; // colored blocks (V1)
 let v2Blocks = []; // black blocks (V2)
 
 // ----------------------------- path animation (controlled by audio) ------------------------
-let pathT = 0; // current position along the path (float index)
+let Train = 0; // current position along the path (float index)
 let basePathSpeed = 0.1; // base speed, will be updated in startAnimation()
 let boostPathSpeed = 0.4; // extra speed based on audio loudness
 let speedScale = 0.28; // global speed control
@@ -29,7 +29,7 @@ let gridRows = 0;
 let gridCols = 0;
 
 // ------------------- audio controls ------------------------------------------
-let soundTrack; // the audio file
+let soundTrack; 
 let amplitude; // p5.Amplitude to measure loudness
 let lastLevel = 0;  // smoothed loudness value
 
@@ -95,7 +95,7 @@ function startAnimation() {
   isAnimating = true;
   animationProgress = 0;
   totalBlocks = animationPath.length;
-  pathT = 0; // start at the beginning of the path
+  Train = 0; // start at the beginning of the path
 
   // control the audio
   if (soundTrack) {
@@ -158,13 +158,13 @@ function updateAnimation() {
   let currentSpeed = (basePathSpeed + mappedBoost) * speedScale;
 
   // move forward along the path using the current speed
-  pathT += currentSpeed;
-  animationProgress = floor(pathT);
+  Train += currentSpeed;
+  animationProgress = floor(Train);
 
   // check if we reached the end of the path
   if (animationProgress >= totalBlocks - 1) {
     animationProgress = totalBlocks - 1;
-    pathT = totalBlocks - 1;
+    Train = totalBlocks - 1;
     isAnimating = false;
   }
 }

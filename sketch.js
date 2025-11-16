@@ -1,43 +1,43 @@
-let sourceImage;
-let artCanvas; 
-let ready = false;
+let mapImage;
+let mondrianCanvas; 
+let isReady = false;
 
 const baseWidth = 1920; // base canvas width
 const baseHeight = 1080; // base canvas height
 
 // sampling parameters to simplify the map image
-const SAMPLE_STEP = 25;
-const UNIT_SIZE = 30;
+const GRID_SPACING = 25;
+const BLOCK_SIZE = 30;
 
 // --------------------------- animation ------------------------------------------
 let isAnimating = false;
-let animationProgress = 0;
-let totalBlocks = 0;
-let v1Blocks = []; // colored blocks (V1)
-let v2Blocks = []; // black blocks (V2)
+let revealedBlockCount = 0;
+let totalPathBlocks = 0;
+let coloredBlocks = []; // colored blocks (V1)
+let blackBlocks = []; // black blocks (V2)
 
 // ----------------------------- path animation (controlled by audio) ------------------------
-let Train = 0; // current position along the path (float index)
-let basePathSpeed = 0.1; // base speed, will be updated in startAnimation()
-let boostPathSpeed = 0.4; // extra speed based on audio loudness
-let speedScale = 0.28; // global speed control
+let pathPosition = 0; // current position along the path (float index)
+let baseSpeed = 0.1; // base speed, will be updated in startAnimation()
+let audioBoostSpeed = 0.4; // extra speed based on audio loudness
+let globalSpeedMultiplier = 0.28; // global speed control
 
-let animationPath = []; // ordered list of blocks for the animation
-let cellToIndex = []; // map from grid cell to v1Blocks index
-let roadGrid = []; // grid showing where roads are (true/false)
+let revealPath = []; // ordered list of blocks for the animation
+let gridCellToBlockIndex = []; // map from grid cell to coloredBlocks index
+let isRoadCell = []; // grid showing where roads are (true/false)
 let gridRows = 0;
 let gridCols = 0;
 
 // ------------------- audio controls ------------------------------------------
-let soundTrack; 
-let amplitude; // p5.Amplitude to measure loudness
-let lastLevel = 0;  // smoothed loudness value
+let backgroundMusic; 
+let audioAnalyzer; // p5.Amplitude to measure loudness
+let currentLoudness = 0;  // smoothed loudness value
 
 
 function preload() {
-  sourceImage = loadImage('Street.png');
+  mapImage = loadImage('Street.png');
   // load image https://p5js.org/reference/p5/preload/
-  soundTrack = loadSound('mix2.mp3'); 
+  backgroundMusic = loadSound('mix2.mp3'); 
 }
 
 function setup() {
@@ -46,15 +46,15 @@ function setup() {
   //Content outside the element box is not shown https://www.w3schools.com/jsref/prop_style_overflow.asp
   document.body.style.overflow = 'hidden';
   // create graphics buffer for art generation
-  artCanvas = createGraphics(600, 600);
-  artCanvas.pixelDensity(1); // https://p5js.org/reference/p5/loadPixels/ // Get the pixel density.
+  mondrianCanvas = createGraphics(600, 600);
+  mondrianCanvas.pixelDensity(1); // https://p5js.org/reference/p5/loadPixels/ // Get the pixel density.
 
   // init audio amplitude
-  amplitude = new p5.Amplitude();
-  amplitude.setInput(soundTrack);
+  audioAnalyzer = new p5.Amplitude();
+  audioAnalyzer.setInput(backgroundMusic);
 
   generateArt();
-  ready = true;
+  isReady = true;
   scaleToWindow(); // scale to window size
 }
 
@@ -69,14 +69,14 @@ function draw() {
   translate(-width / 2, -zoomAnchorY / 2);
   // draw the static background
   drawBackground();
-  if (ready) {
+  if (isReady) {
     // update animation state
     if (isAnimating) {
       updateAnimation();
     }
-    // redraw artCanvas based on current animationProgress
+    // redraw mondrianCanvas based on current revealedBlockCount
     renderArt();
-    image(artCanvas, 656, 152, 600, 600);
+    image(mondrianCanvas, 656, 152, 600, 600);
   }
   pop();
 }
@@ -89,27 +89,27 @@ function mousePressed() {
 // reset and start the reveal
 function startAnimation() {
   // if there is no path, do nothing
-  if (animationPath.length === 0) return;
+  if (revealPath.length === 0) return;
 
   // reset animation state
   isAnimating = true;
-  animationProgress = 0;
-  totalBlocks = animationPath.length;
-  Train = 0; // start at the beginning of the path
+  revealedBlockCount = 0;
+  totalPathBlocks = revealPath.length;
+  pathPosition = 0; // start at the beginning of the path
 
   // control the audio
-  if (soundTrack) {
+  if (backgroundMusic) {
     // if the sound is already playing, stop it first
-    if (soundTrack.isPlaying()) {
-      soundTrack.stop();
+    if (backgroundMusic.isPlaying()) {
+      backgroundMusic.stop();
     }
     // play from the start
-    soundTrack.play();
+    backgroundMusic.play();
   }
 
   // set a base speed so the animation roughly matches the audio length
-  if (soundTrack && soundTrack.isLoaded() && totalBlocks > 0) {
-    const duration = soundTrack.duration(); // total audio length in seconds
+  if (backgroundMusic && backgroundMusic.isLoaded() && totalPathBlocks > 0) {
+    const duration = backgroundMusic.duration(); // total audio length in seconds
 
     // try to get the current frame rate
     let fps = frameRate();
@@ -121,48 +121,48 @@ function startAnimation() {
 
     // target speed: if we only use this speed,
     // the path will finish around the end of the audio
-    const targetBaseSpeed = totalBlocks / framesTotal;
+    const targetBaseSpeed = totalPathBlocks / framesTotal;
 
     // use 70% of that speed to leave room for audio-based boost
-    basePathSpeed = targetBaseSpeed * 0.7;
+    baseSpeed = targetBaseSpeed * 0.7;
 
     // keep the base speed in a safe range
-    basePathSpeed = constrain(basePathSpeed, 0.02, 1.5);
+    baseSpeed = constrain(baseSpeed, 0.02, 1.5);
   }
 }
 
 function updateAnimation() {
   // if there is no path, do nothing
-  if (animationPath.length === 0) return;
+  if (revealPath.length === 0) return;
 
   // get current loudness level from the audio
   let level = 0;
-  if (amplitude) {
-    level = amplitude.getLevel();
+  if (audioAnalyzer) {
+    level = audioAnalyzer.getLevel();
   }
 
-  lastLevel = level;
+  currentLoudness = level;
 
   // if the audio loudness is below this threshold, the animation should completely stop (no movement).
   const silenceThreshold = 0.02; 
-  if (lastLevel < silenceThreshold) {
+  if (currentLoudness < silenceThreshold) {
     return;
   }
 
   // map the loudness to an extra speed (boost)
   let mappedBoost = map(
-    lastLevel, 0, 0.3, 0, boostPathSpeed, true
+    currentLoudness, 0, 0.3, 0, audioBoostSpeed, true
   );
-  let currentSpeed = (basePathSpeed + mappedBoost) * speedScale;
+  let currentSpeed = (baseSpeed + mappedBoost) * globalSpeedMultiplier;
 
   // move forward along the path using the current speed
-  Train += currentSpeed;
-  animationProgress = floor(Train);
+  pathPosition += currentSpeed;
+  revealedBlockCount = floor(pathPosition);
 
   // check if we reached the end of the path
-  if (animationProgress >= totalBlocks - 1) {
-    animationProgress = totalBlocks - 1;
-    Train = totalBlocks - 1;
+  if (revealedBlockCount >= totalPathBlocks - 1) {
+    revealedBlockCount = totalPathBlocks - 1;
+    pathPosition = totalPathBlocks - 1;
     isAnimating = false;
   }
 }
@@ -170,31 +170,31 @@ function updateAnimation() {
 
 // draw two layers（V2 base, V1 on top, partially revealed）
 function renderArt() {
-  artCanvas.push();
-  artCanvas.clear();
-  artCanvas.background('#EBEAE6');
-  artCanvas.noStroke();
+  mondrianCanvas.push();
+  mondrianCanvas.clear();
+  mondrianCanvas.background('#EBEAE6');
+  mondrianCanvas.noStroke();
   // First draw the large square layer
   drawSVGBlocks();
   // V2 black base layer (always fully visible)
-  for (let i = 0; i < v2Blocks.length; i++) {
-  const block = v2Blocks[i];
-  feltifyRect(artCanvas, block.x, block.y, block.w, block.h, block.color, 1.2);
+  for (let i = 0; i < blackBlocks.length; i++) {
+  const block = blackBlocks[i];
+  feltifyRect(mondrianCanvas, block.x, block.y, block.w, block.h, block.color, 1.2);
 }
   // V1 colored layer (only draw blocks that have been revealed)
-  const limit = Math.min(animationProgress, animationPath.length);
+  const limit = Math.min(revealedBlockCount, revealPath.length);
   for (let i = 0; i < limit; i++) {
-    const block = animationPath[i];
-    feltifyRectV1(artCanvas, block.x, block.y, block.w, block.h, block.color, 1.2); // feltifyRectV1
+    const block = revealPath[i];
+    feltifyRectV1(mondrianCanvas, block.x, block.y, block.w, block.h, block.color, 1.2); // feltifyRectV1
   }
-  artCanvas.pop();
+  mondrianCanvas.pop();
 }
 
 // V2 - simplified to just black
 const BLACK_COLOR = '#000000ff';
 
 // V1 colored lines
-let colorsV1 = {
+let mondrianColors = {
   gray: '#d6d7d2',
   yellow: '#e1c927',
   red: '#ad372b',
@@ -205,40 +205,40 @@ let colorsV1 = {
 // new generateArt，prepare all V2 and V1 blocks (store as data, not directly draw)
 function generateArt() {
   // clear previous blocks
-  v1Blocks = [];
-  v2Blocks = [];
-  animationPath = [];
-  cellToIndex = [];
-  roadGrid = [];
+  coloredBlocks = [];
+  blackBlocks = [];
+  revealPath = [];
+  gridCellToBlockIndex = [];
+  isRoadCell = [];
   // https://p5js.org/reference/p5/loadPixels/
-  sourceImage.loadPixels();
+  mapImage.loadPixels();
   // scale & blocksize
-  const scaleX = artCanvas.width / sourceImage.width;
-  const scaleY = artCanvas.height / sourceImage.height;
-  const blockSize = UNIT_SIZE * Math.min(scaleX, scaleY);
+  const scaleX = mondrianCanvas.width / mapImage.width;
+  const scaleY = mondrianCanvas.height / mapImage.height;
+  const blockSize = BLOCK_SIZE * Math.min(scaleX, scaleY);
   // create grid for storing colors
-  const rows = Math.ceil(sourceImage.height / SAMPLE_STEP);
-  const cols = Math.ceil(sourceImage.width / SAMPLE_STEP);
+  const rows = Math.ceil(mapImage.height / GRID_SPACING);
+  const cols = Math.ceil(mapImage.width / GRID_SPACING);
   gridRows = rows;
   gridCols = cols;
 
   // ---------------------V2-------------------------------------------------------
   // track which cells are roads
-  roadGrid = Array(rows).fill().map(function () {
+  isRoadCell = Array(rows).fill().map(function () {
   return Array(cols).fill(false);
 });
   // V2 sampling - simplified since all blocks are black
-  for (let y = 0, row = 0; y < sourceImage.height; y += SAMPLE_STEP, row++) {
-    for (let x = 0, col = 0; x < sourceImage.width; x += SAMPLE_STEP, col++) {
+  for (let y = 0, row = 0; y < mapImage.height; y += GRID_SPACING, row++) {
+    for (let x = 0, col = 0; x < mapImage.width; x += GRID_SPACING, col++) {
       // Get pixel color
-      const idx = (y * sourceImage.width + x) * 4;
-      const r = sourceImage.pixels[idx];
-      const g = sourceImage.pixels[idx + 1];
-      const b = sourceImage.pixels[idx + 2];
+      const pixelIndex = (y * mapImage.width + x) * 4;
+      const r = mapImage.pixels[pixelIndex];
+      const g = mapImage.pixels[pixelIndex + 1];
+      const b = mapImage.pixels[pixelIndex + 2];
       // Check if it's a road pixel (white color)
       if (r > 240 && g > 240 && b > 240) {
-        roadGrid[row][col] = true; // mark as road for path building
-        v2Blocks.push({
+        isRoadCell[row][col] = true; // mark as road for path building
+        blackBlocks.push({
           x: x * scaleX,
           y: y * scaleY,
           w: blockSize,
@@ -254,18 +254,18 @@ function generateArt() {
   const gridV1 = Array(rows).fill().map(function () {
   return Array(cols).fill(null);
 });
-  cellToIndex = Array(rows).fill().map(function () {
+  gridCellToBlockIndex = Array(rows).fill().map(function () {
   return Array(cols).fill(null);
 });
 
   // V1 sampling
-  for (let y = 0, row = 0; y < sourceImage.height; y += SAMPLE_STEP, row++) {
-    for (let x = 0, col = 0; x < sourceImage.width; x += SAMPLE_STEP, col++) {
+  for (let y = 0, row = 0; y < mapImage.height; y += GRID_SPACING, row++) {
+    for (let x = 0, col = 0; x < mapImage.width; x += GRID_SPACING, col++) {
       // Get pixel color
-      const idx = (y * sourceImage.width + x) * 4;
-      const r = sourceImage.pixels[idx];
-      const g = sourceImage.pixels[idx + 1];
-      const b = sourceImage.pixels[idx + 2];
+      const pixelIndex = (y * mapImage.width + x) * 4;
+      const r = mapImage.pixels[pixelIndex];
+      const g = mapImage.pixels[pixelIndex + 1];
+      const b = mapImage.pixels[pixelIndex + 2];
       // Check if it's a road pixel (white color)
       if (r > 240 && g > 240 && b > 240) {
         gridV1[row][col] = chooseColorV1(gridV1, row, col); // V1 chooseColorV1
@@ -278,37 +278,37 @@ function generateArt() {
           row: row,
           col: col
         };
-        v1Blocks.push(block);
-        cellToIndex[row][col] = v1Blocks.length - 1; // save index for path building
+        coloredBlocks.push(block);
+        gridCellToBlockIndex[row][col] = coloredBlocks.length - 1; // save index for path building
       }
     }
   }
   // build a continuous path through the road network
   buildAnimationPath();
-  totalBlocks = animationPath.length;
+  totalPathBlocks = revealPath.length;
 }
 
 // Idea: use DFS + backtracking to try to visit as many road cells as possible since the audio is long
 function buildAnimationPath() {
-  animationPath = [];
-  if (!roadGrid || gridRows === 0 || gridCols === 0) return;
+  revealPath = [];
+  if (!isRoadCell || gridRows === 0 || gridCols === 0) return;
   const directions = [
-    { dr: 0, dc: 1 }, // right
-    { dr: 1, dc: 0 }, // down
-    { dr: 0, dc: -1 }, // left
-    { dr: -1, dc: 0 }  // up
+    { rowChange: 0, colChange: 1 }, // right
+    { rowChange: 1, colChange: 0 }, // down
+    { rowChange: 0, colChange: -1 }, // left
+    { rowChange: -1, colChange: 0 }  // up
   ];
 
   // Count how many road neighbors a cell has (ignoring visited)
   function roadDegree(row, col) {
     let count = 0;
     for (let d of directions) {
-      const nr = row + d.dr;
-      const nc = col + d.dc;
+      const nextRow = row + d.rowChange;
+      const nextCol = col + d.colChange;
       if (
-        nr >= 0 && nr < gridRows &&
-        nc >= 0 && nc < gridCols &&
-        roadGrid[nr][nc]
+        nextRow >= 0 && nextRow < gridRows &&
+        nextCol >= 0 && nextCol < gridCols &&
+        isRoadCell[nextRow][nextCol]
       ) {
         count++;
       }
@@ -321,11 +321,11 @@ function buildAnimationPath() {
   let start = null;
   for (let r = 0; r < gridRows; r++) {
     for (let c = 0; c < gridCols; c++) {
-      if (roadGrid[r][c] && roadDegree(r, c) === 1) {
+      if (isRoadCell[r][c] && roadDegree(r, c) === 1) {
         start = { row: r, col: c };
         break;
       }
-      if (!start && roadGrid[r][c]) {
+      if (!start && isRoadCell[r][c]) {
         start = { row: r, col: c };
       }
     }
@@ -356,15 +356,15 @@ let currentPath = [];
     // collect unvisited neighbor road cells
     let neighbors = [];
     for (let d of directions) {
-      const nr = row + d.dr;
-      const nc = col + d.dc;
+      const nextRow = row + d.rowChange;
+      const nextCol = col + d.colChange;
       if (
-        nr >= 0 && nr < gridRows &&
-        nc >= 0 && nc < gridCols &&
-        roadGrid[nr][nc] &&
-        !visited[nr][nc]
+        nextRow >= 0 && nextRow < gridRows &&
+        nextCol >= 0 && nextCol < gridCols &&
+        isRoadCell[nextRow][nextCol] &&
+        !visited[nextRow][nextCol]
       ) {
-        neighbors.push({ row: nr, col: nc });
+        neighbors.push({ row: nextRow, col: nextCol });
       }
     }
 
@@ -385,29 +385,29 @@ for (let n of neighbors) {
   }
   // run the DFS from the chosen start cell
   dfs(start.row, start.col);
-  // turn grid coordinates into actual v1Blocks for drawing
-  animationPath = [];
+  // turn grid coordinates into actual coloredBlocks for drawing
+  revealPath = [];
   for (let k = 0; k < bestPathCoords.length; k++) {
     const { row, col } = bestPathCoords[k];
-    const idx = cellToIndex[row][col];
+    const idx = gridCellToBlockIndex[row][col];
     if (idx !== null && idx !== undefined) {
-      animationPath.push(v1Blocks[idx]);
+      revealPath.push(coloredBlocks[idx]);
     }
   }
-  totalBlocks = animationPath.length;
+  totalPathBlocks = revealPath.length;
 }
 
 // Mondrian-style big blocks with audio-reactive scaling
 function drawSVGBlocks() {
-  const g = artCanvas;
+  const g = mondrianCanvas;
   g.noStroke();
 
   // layout is in a 1600 x 1600 design space
   const s = 1600 / 600; 
 
 
-  // Map the current audio level (lastLevel) to 0–1
-  const ampNorm = constrain(map(lastLevel, 0, 0.3, 0, 1, true), 0, 1);
+  // Map the current audio level (currentLoudness) to 0–1
+  const ampNorm = constrain(map(currentLoudness, 0, 0.3, 0, 1, true), 0, 1);
   const center = (ampNorm - 0.5) * 2.0;
 
   const MAX_SCALE_RATIO = 0.2; // how much blocks can grow or shrink
@@ -449,26 +449,26 @@ function drawSVGBlocks() {
 function chooseColorV1(grid, row, col) {
   const avoid = [];
   // Check top neighbor（&& is like and in python）
-  if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== colorsV1.yellow) {
+  if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== mondrianColors.yellow) {
     avoid.push(grid[row - 1][col]);
   }
   // Check left neighbor
-  if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== colorsV1.yellow) {
+  if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== mondrianColors.yellow) {
     avoid.push(grid[row][col - 1]);
   }
   // color weights
   const weights = [
-    { color: colorsV1.gray, weight: 15 },
-    { color: colorsV1.yellow, weight: 45 },
-    { color: colorsV1.red, weight: 20 },
-    { color: colorsV1.blue, weight: 20 }
+    { color: mondrianColors.gray, weight: 15 },
+    { color: mondrianColors.yellow, weight: 45 },
+    { color: mondrianColors.red, weight: 20 },
+    { color: mondrianColors.blue, weight: 20 }
   ];
   // filter out avoided colors
   const available = weights.filter(function (w) {
     return !avoid.includes(w.color);
   });
   // default to yellow if no colors available（since the original work has lots of yellow）
-  if (available.length === 0) return colorsV1.yellow;
+  if (available.length === 0) return mondrianColors.yellow;
   // calculate total weight
   const total = available.reduce(function (sum, w) {
     return sum + w.weight;
@@ -521,8 +521,8 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
   g.fill(c);
   g.rect(x, y, w, h);
   // slight shaking
-  const amp = 0.20 * ampScale;
-  const freq = 0.1;
+  const wobbleAmount = 0.20 * ampScale;
+  const noiseFrequency = 0.1;
   const layers = 2; // change to 2 to refine the rendering speed
   for (let l = 0; l < layers; l++) {
     g.noFill();
@@ -531,27 +531,27 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
     g.beginShape();
     // up
     for (let i = 0; i <= 1; i += 0.02) {
-      const n = noise((x + i * w) * freq, (y + l * 50) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(x + i * w, constrain(y + offset, y - amp, y + amp));
+      const n = noise((x + i * w) * noiseFrequency, (y + l * 50) * noiseFrequency);
+      const offset = map(n, 0, 1, -wobbleAmount, wobbleAmount);
+      g.vertex(x + i * w, constrain(y + offset, y - wobbleAmount, y + wobbleAmount));
     }
     // right
     for (let i = 0; i <= 1; i += 0.02) {
-      const n = noise((x + w + l * 20) * freq, (y + i * h) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(constrain(x + w + offset, x + w - amp, x + w + amp), y + i * h);
+      const n = noise((x + w + l * 20) * noiseFrequency, (y + i * h) * noiseFrequency);
+      const offset = map(n, 0, 1, -wobbleAmount, wobbleAmount);
+      g.vertex(constrain(x + w + offset, x + w - wobbleAmount, x + w + wobbleAmount), y + i * h);
     }
     // down
     for (let i = 1; i >= 0; i -= 0.02) {
-      const n = noise((x + i * w) * freq, (y + h + l * 40) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(x + i * w, constrain(y + h + offset, y + h - amp, y + h + amp));
+      const n = noise((x + i * w) * noiseFrequency, (y + h + l * 40) * noiseFrequency);
+      const offset = map(n, 0, 1, -wobbleAmount, wobbleAmount);
+      g.vertex(x + i * w, constrain(y + h + offset, y + h - wobbleAmount, y + h + wobbleAmount));
     }
     // left
     for (let i = 1; i >= 0; i -= 0.02) {
-      const n = noise((x + l * 30) * freq, (y + i * h) * freq);
-      const offset = map(n, 0, 1, -amp, amp);
-      g.vertex(constrain(x + offset, x - amp, x + amp), y + i * h);
+      const n = noise((x + l * 30) * noiseFrequency, (y + i * h) * noiseFrequency);
+      const offset = map(n, 0, 1, -wobbleAmount, wobbleAmount);
+      g.vertex(constrain(x + offset, x - wobbleAmount, x + wobbleAmount), y + i * h);
     }
     g.endShape(CLOSE);
   }

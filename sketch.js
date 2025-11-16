@@ -20,7 +20,7 @@ let blackBlocks = []; // black blocks (V2)
 let pathPosition = 0; // current position along the path (float index)
 let baseSpeed = 0.1; // base speed, will be updated in startAnimation()
 let audioBoostSpeed = 0.4; // extra speed based on audio loudness
-let globalSpeedMultiplier = 0.28; // global speed control
+let globalSpeedMultiplier = 0.22; // global speed control
 
 let revealPath = []; // ordered list of blocks for the animation
 let gridCellToBlockIndex = []; // map from grid cell to coloredBlocks index
@@ -106,29 +106,9 @@ function startAnimation() {
     // play from the start
     backgroundMusic.play();
   }
-
-  // set a base speed so the animation roughly matches the audio length
-  if (backgroundMusic && backgroundMusic.isLoaded() && totalPathBlocks > 0) {
-    const duration = backgroundMusic.duration(); // total audio length in seconds
-
-    // try to get the current frame rate
-    let fps = frameRate();
-    if (!isFinite(fps) || fps <= 0) {
-      fps = 60; // fallback if frameRate is not ready
-    }
-
-    const framesTotal = duration * fps;
-
-    // target speed: if we only use this speed,
-    // the path will finish around the end of the audio
-    const targetBaseSpeed = totalPathBlocks / framesTotal;
-
-    // use 70% of that speed to leave room for audio-based boost
-    baseSpeed = targetBaseSpeed * 0.7;
-
-    // keep the base speed in a safe range
-    baseSpeed = constrain(baseSpeed, 0.02, 1.5);
-  }
+  
+  // baseSpeed is already set to 0.1, and globalSpeedMultiplier to 0.28
+  // These values are manually tuned to match the audio
 }
 
 function updateAnimation() {

@@ -12,13 +12,12 @@ let animationProgress = 0;
 let totalBlocks = 0;
 let v1Blocks = [];
 let v2Blocks = [];
-
 // path animation stuff
 let pathT = 0; // position on the path (float index)
 const PATH_SPEED = 0.35; // how fast the animation moves
 let animationPath = []; // the actual path for animation
 let cellToIndex = []; // maps grid position to v1Blocks index
-let roadGrid = []; // boolean grid showing where roads are
+let roadGrid = []; // grid showing where roads are
 let gridRows = 0;
 let gridCols = 0;
 
@@ -30,14 +29,11 @@ function preload() {
 function setup() {
   createCanvas(baseWidth, baseHeight); // create main canvas
   pixelDensity(1);
-
   //Content outside the element box is not shown https://www.w3schools.com/jsref/prop_style_overflow.asp
   document.body.style.overflow = 'hidden';
-
   // create graphics buffer for art generation
   artCanvas = createGraphics(600, 600);
   artCanvas.pixelDensity(1); // https://p5js.org/reference/p5/loadPixels/ // Get the pixel density.
-
   generateArt();
   ready = true;
   scaleToWindow(); // scale to window size
@@ -52,21 +48,17 @@ function draw() {
   translate(width / 2, zoomAnchorY / 2);
   scale(zoom);
   translate(-width / 2, -zoomAnchorY / 2);
-
   // draw the static background
   drawBackground();
-
   if (ready) {
     // update animation state
     if (isAnimating) {
       updateAnimation();
     }
-
     // redraw artCanvas based on current animationProgress
     renderArt();
     image(artCanvas, 656, 152, 600, 600);
   }
-
   pop();
 }
 
@@ -74,11 +66,9 @@ function draw() {
 function mousePressed() {
   startAnimation();
 }
-
 // reset and start the reveal
 function startAnimation() {
   if (animationPath.length === 0) return; // no path, no animation
-
   isAnimating = true;
   animationProgress = 0;
   totalBlocks = animationPath.length;
@@ -88,13 +78,10 @@ function startAnimation() {
 // update animation progress
 function updateAnimation() {
   if (animationPath.length === 0) return;
-
   // animation moves forward smoothly
   pathT += PATH_SPEED;
-
   // blocks appear progressively
   animationProgress = floor(pathT);
-
   // check if we reached the end
   if (animationProgress >= totalBlocks - 1) {
     animationProgress = totalBlocks - 1;
@@ -109,22 +96,18 @@ function renderArt() {
   artCanvas.clear();
   artCanvas.background('#EBEAE6');
   artCanvas.noStroke();
-
   // First draw the large square layer
   drawSVGBlocks();
-
   // V2 black base layer (always fully visible)
   v2Blocks.forEach(block => {
     feltifyRect(artCanvas, block.x, block.y, block.w, block.h, block.color, 1.2); // V2 feltifyRect
   });
-
   // V1 colored layer (only draw blocks that have been revealed)
   const limit = Math.min(animationProgress, animationPath.length);
   for (let i = 0; i < limit; i++) {
     const block = animationPath[i];
     feltifyRectV1(artCanvas, block.x, block.y, block.w, block.h, block.color, 1.2); // feltifyRectV1
   }
-
   artCanvas.pop();
 }
 
@@ -148,10 +131,8 @@ function generateArt() {
   animationPath = [];
   cellToIndex = [];
   roadGrid = [];
-
   // https://p5js.org/reference/p5/loadPixels/
   sourceImage.loadPixels();
-
   // scale & blocksize
   const scaleX = artCanvas.width / sourceImage.width;
   const scaleY = artCanvas.height / sourceImage.height;
@@ -231,7 +212,6 @@ function buildAnimationPath() {
   for (let r = 0; r < gridRows; r++) {
     for (let c = 0; c < gridCols; c++) {
       if (!roadGrid[r][c]) continue;
-
       const neighbors = countRoadNeighbors(r, c);
       if (neighbors === 1) {
         start = { row: r, col: c };
@@ -403,15 +383,12 @@ function chooseColorV1(grid, row, col) {
 // Background space drawing function - simplified without shadows
 function drawBackground() {
   noStroke();
-
   // wall
   fill('#F5F4F0');
   rect(0, 2, 1920, 910);
-
   // floor line
   fill('#6C4D38');
   rect(0, 868, 1920, 8);
-
   // floor strips
   fill('#A88974');
   rect(0, 875, 1920, 8);
@@ -421,11 +398,7 @@ function drawBackground() {
   rect(0, 895, 1920, 20);
   fill('#DDC3AC');
   rect(0, 915, 1920, 30);
-  fill('#DDBFA7');
-  rect(0, 945, 1920, 40);
-  fill('#E4C9B4');
-  rect(0, 985, 1920, 50);
-  // static frame layers (no movement)
+  // static frame layers
   fill('#A88974'); // deepest shadow
   rect(630, 132, 670, 677);
   fill('#E1E0DC'); // light edge of the frame
@@ -442,12 +415,10 @@ function feltifyRect(g, x, y, w, h, c, ampScale = 1) {
   g.noStroke();
   g.fill(c);
   g.rect(x, y, w, h);
-
   // slight shaking
   const amp = 0.20 * ampScale;
   const freq = 0.1;
   const layers = 5;
-
   for (let l = 0; l < layers; l++) {
     g.noFill();
     g.stroke(red(c), green(c), blue(c), map(l, 0, layers - 1, 100, 50));
@@ -493,40 +464,33 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
   g.noStroke();
   g.fill(c);
   g.rect(x, y, w, h);
-
   // slight shaking
   const amp = 0.20 * ampScale;
   const freq = 0.1;
   const layers = 6;
-
   for (let l = 0; l < layers; l++) {
     g.noFill();
     g.stroke(red(c), green(c), blue(c), map(l, 0, layers - 1, 100, 50));
     g.strokeWeight(map(l, 0, layers - 1, 2.2, 1));
-
     g.beginShape();
-
     // up
     for (let i = 0; i <= 1; i += 0.02) {
       const n = noise((x + i * w) * freq, (y + l * 50) * freq);
       const offset = map(n, 0, 1, -amp, amp);
       g.vertex(x + i * w, constrain(y + offset, y - amp, y + amp));
     }
-
     // right
     for (let i = 0; i <= 1; i += 0.02) {
       const n = noise((x + w + l * 20) * freq, (y + i * h) * freq);
       const offset = map(n, 0, 1, -amp, amp);
       g.vertex(constrain(x + w + offset, x + w - amp, x + w + amp), y + i * h);
     }
-
     // down
     for (let i = 1; i >= 0; i -= 0.02) {
       const n = noise((x + i * w) * freq, (y + h + l * 40) * freq);
       const offset = map(n, 0, 1, -amp, amp);
       g.vertex(x + i * w, constrain(y + h + offset, y + h - amp, y + h + amp));
     }
-
     // left
     for (let i = 1; i >= 0; i -= 0.02) {
       const n = noise((x + l * 30) * freq, (y + i * h) * freq);
@@ -535,7 +499,6 @@ function feltifyRectV1(g, x, y, w, h, c, ampScale = 1) {
     }
     g.endShape(CLOSE);
   }
-
   // soft glow outline
   g.stroke(red(c), green(c), blue(c), 40);
   g.strokeWeight(3);

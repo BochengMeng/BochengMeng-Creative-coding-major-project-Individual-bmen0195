@@ -38,7 +38,11 @@ class Block {
 
 // ---------------- RoadGrid class --------------------
 // this class keeps the road grid and build a long path for animation.
-// DFS + backtracking to try to visit as many road cells as possible
+// DFS + backtracking to try to find longest path 
+// !!!!!!!!!!!!!!!! DFS idea: FROM GPT5.1
+
+// https://chatgpt.com/s/t_691ae4dcbbac81918c31ce019237466a // https://chatgpt.com/s/t_691ae4ffa11c8191ae3fa38cf06459d7
+
 class RoadGrid {
   constructor(isRoadCell, gridCellToBlockIndex, gridRows, gridCols, coloredBlocks) {
     // 2D boolean grid: true = this cell is a road
@@ -95,7 +99,10 @@ class RoadGrid {
   }
 
   // Build one continuous path through the road network.
-  // DFS reference idea: https://en.wikipedia.org/wiki/Depth-first_search
+  // !!!!!!!!!!!!!!!! DFS idea: FROM GPT5.1 
+
+  // https://chatgpt.com/s/t_691ae4dcbbac81918c31ce019237466a // https://chatgpt.com/s/t_691ae4ffa11c8191ae3fa38cf06459d7
+
   buildAnimationPath() {
     let revealPathBlocks = [];
 

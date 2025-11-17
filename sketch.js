@@ -213,7 +213,7 @@ let blackBlocks = []; // black blocks (V2) - Block objects
 let pathPosition = 0; // current position along the path (float index)
 let baseSpeed = 0.1; // base speed, will be updated in startAnimation()
 let audioBoostSpeed = 0.4; // extra speed based on audio loudness
-let globalSpeedMultiplier = 0.22; // global speed control
+let globalSpeedMultiplier = 0.24; // global speed control
 
 let revealPath = []; // ordered list of Blocks for the animation
 let gridCellToBlockIndex = []; // map from grid cell to coloredBlocks index

@@ -2,8 +2,9 @@ let mapImage;
 let mondrianCanvas; 
 let isReady = false;
 
-const baseWidth = 1920; // base canvas width
-const baseHeight = 1080; // base canvas height
+// Fixed design space (virtual canvas) for layout
+const DESIGN_W = 1920; // design width
+const DESIGN_H = 1080; // design height
 
 // sampling parameters to simplify the map image
 const GRID_SPACING = 25;
@@ -48,14 +49,14 @@ class RoadGrid {
 
     // directions for DFS: right, down, left, up
     this.directions = [
-      { rowChange: 0, colChange: 1 }, // right
-      { rowChange: 1, colChange: 0 }, // down
+      { rowChange: 0, colChange: 1 },  // right
+      { rowChange: 1, colChange: 0 },  // down
       { rowChange: 0, colChange: -1 }, // left
       { rowChange: -1, colChange: 0 }  // up
     ];
   }
 
-  // helper: check inside grid
+  // check inside grid
   isInside(row, col) {
     return (
       row >= 0 && row < this.gridRows &&
@@ -63,12 +64,12 @@ class RoadGrid {
     );
   }
 
-  // helper: check if this cell is a road
+  // check if this cell is a road
   isRoad(row, col) {
     return this.isInside(row, col) && this.isRoadCell[row][col];
   }
 
-  // helper: how many road neighbors a cell has
+  // how many road neighbors a cell has
   functionRoadDegree(row, col) {
     let count = 0;
     for (let d of this.directions) {
@@ -81,7 +82,7 @@ class RoadGrid {
     return count;
   }
 
-  // helper: convert grid coord to Block object
+  // convert grid coord to Block object
   coordToBlock(row, col) {
     const idx = this.gridCellToBlockIndex[row][col];
     if (idx !== null && idx !== undefined) {
@@ -187,7 +188,7 @@ let isAnimating = false;
 let revealedBlockCount = 0;
 let totalPathBlocks = 0;
 let coloredBlocks = []; // colored blocks (V1) - Block objects
-let blackBlocks = [];   // black blocks (V2) - Block objects
+let blackBlocks = []; // black blocks (V2) - Block objects
 
 // ----------------------------- path animation (controlled by audio) ------------------------
 let pathPosition = 0; // current position along the path (float index)
@@ -204,8 +205,7 @@ let gridCols = 0;
 // ------------------- audio controls ------------------------------------------
 let backgroundMusic; 
 let audioAnalyzer; // p5.Amplitude to measure loudness
-let currentLoudness = 0;  // smoothed loudness value
-
+let currentLoudness = 0; // smoothed loudness value
 
 function preload() {
   mapImage = loadImage('Street.png');
@@ -214,7 +214,8 @@ function preload() {
 }
 
 function setup() {
-  createCanvas(baseWidth, baseHeight); // create main canvas
+  // canvas size follows the window; we will draw a fixed 1920x1080 "wall" inside it
+  createCanvas(windowWidth, windowHeight);
   pixelDensity(1);
 
   //Content outside the element box is not shown https://www.w3schools.com/jsref/prop_style_overflow.asp
@@ -222,7 +223,7 @@ function setup() {
 
   // create graphics buffer for art generation
   mondrianCanvas = createGraphics(600, 600);
-  mondrianCanvas.pixelDensity(1); // https://p5js.org/reference/p5/pixelDensity/ // Get the pixel density.
+  mondrianCanvas.pixelDensity(1); // https://p5js.org/reference/p5/pixelDensity/
 
   // init audio amplitude
   audioAnalyzer = new p5.Amplitude();
@@ -230,20 +231,29 @@ function setup() {
 
   generateArt();
   isReady = true;
-  scaleToWindow(); // scale to window size
 }
 
 function draw() {
-  //resizing and fitting
-  background(255);
-  let zoom = 1.25;
-  let zoomAnchorY = height * 0.75;
-  push();
-  translate(width / 2, zoomAnchorY / 2);
-  scale(zoom);
-  translate(-width / 2, -zoomAnchorY / 2);
+  // Responsive scaling:.
+  const s = Math.max(width / DESIGN_W, height / DESIGN_H);
+  const offsetX = (width - DESIGN_W * s) / 2;
+  const offsetY = (height - DESIGN_H * s) / 2;
 
-  // draw the static background
+  background(255);
+
+  push();
+  translate(offsetX, offsetY);
+  scale(s);
+
+  // zoom inside the design space (since the original one is too small)
+  let zoom = 1.25;
+  let zoomAnchorY = DESIGN_H * 0.75;
+  push();
+  translate(DESIGN_W / 2, zoomAnchorY / 2);
+  scale(zoom);
+  translate(-DESIGN_W / 2, -zoomAnchorY / 2);
+
+  // draw the static background (wall + frame)
   drawBackground();
 
   if (isReady) {
@@ -256,12 +266,19 @@ function draw() {
     renderArt();
     image(mondrianCanvas, 656, 152, 600, 600);
   }
-  pop();
+
+  pop(); // end zoom
+  pop(); // end responsive scaling
 }
 
 // click to start / restart the animation
 function mousePressed() {
   startAnimation();
+}
+
+// when the window size changes, resize the canvas to match the new window
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
 }
 
 // reset and start the reveal
@@ -318,16 +335,16 @@ function renderArt() {
   mondrianCanvas.background('#EBEAE6');
   mondrianCanvas.noStroke();
 
-  // 1) big Mondrian blocks (audio reactive) —— 跟你原来完全一样，只是函数名改了
+  // big Mondrian blocks (audio reactive)
   drawSVGBlocks();
 
-  // 2) V2 black base layer (always fully visible)
+  // V2 black base layer (always fully visible)
   for (let i = 0; i < blackBlocks.length; i++) {
     const block = blackBlocks[i];
     block.drawV2(mondrianCanvas);
   }
 
-  // 3) V1 colored layer (only draw blocks that have been revealed)
+  // V1 colored layer (only draw blocks that have been revealed)
   const limit = Math.min(revealedBlockCount, revealPath.length);
   for (let i = 0; i < limit; i++) {
     const block = revealPath[i];
@@ -349,7 +366,7 @@ let mondrianColors = {
   bg: '#EBEAE6'
 };
 
-// new generateArt，prepare all V2 and V1 blocks (store as Block data, not directly draw)
+// prepare all V2 and V1 blocks (store as Block data, not directly draw)
 function generateArt() {
   // clear previous blocks
   coloredBlocks = [];
@@ -514,7 +531,6 @@ function drawSVGBlocks() {
   R(1295, 915, 75, 75, '#d6d7d2', 1);
 }
 
-
 // (V1) choose color with probability and neighbor checking （like in mondian's work）
 function chooseColorV1(grid, row, col) {
   const avoid = [];
@@ -559,15 +575,21 @@ function chooseColorV1(grid, row, col) {
 // Background space drawing function - simplified without shadows
 function drawBackground() {
   noStroke();
+
   // wall
-  fill('#F5F4F0'); rect(0, 2, 1920, 910);
+  fill('#F5F4F0'); 
+  rect(0, 2, DESIGN_W, 910);
+
   // floor line
-  fill('#6C4D38'); rect(0, 868, 1920, 8);
+  fill('#6C4D38'); 
+  rect(0, 868, DESIGN_W, 8);
+
   // floor strips
-  fill('#A88974'); rect(0, 875, 1920, 8);
-  fill('#DBBDA5'); rect(0, 883, 1920, 12);
-  fill('#CEB1A1'); rect(0, 895, 1920, 20);
-  fill('#DDC3AC'); rect(0, 915, 1920, 30);
+  fill('#A88974'); rect(0, 875, DESIGN_W, 8);
+  fill('#DBBDA5'); rect(0, 883, DESIGN_W, 12);
+  fill('#CEB1A1'); rect(0, 895, DESIGN_W, 20);
+  fill('#DDC3AC'); rect(0, 915, DESIGN_W, 30);
+
   // static frame layers
   fill('#A88974'); rect(630, 132, 670, 677);
   fill('#E1E0DC'); rect(620, 120, 666, 664);
@@ -594,7 +616,7 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
 
   const wobbleAmount = 0.20 * ampScale;
   const noiseFrequency = 0.1;
-  const layers = 2; // 2 layers to keep speed
+  const layers = 2; // 2 layers to keep rendering speed
 
   for (let l = 0; l < layers; l++) {
     g.noFill();
@@ -647,18 +669,3 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
   g.rect(x, y, w, h);
 }
 
-function scaleToWindow() {
-  let scaleX = windowWidth / baseWidth;
-  let scaleY = windowHeight / baseHeight;
-  let scale = Math.max(scaleX, scaleY);
-  let canvasElement = document.querySelector('canvas');
-  canvasElement.style.position = "absolute";
-  canvasElement.style.left = "50%";
-  canvasElement.style.top = "50%";
-  canvasElement.style.transformOrigin = "center center";
-  canvasElement.style.transform = `translate(-50%, -50%) scale(${scale})`;
-}
-
-function windowResized() {
-  scaleToWindow();
-}

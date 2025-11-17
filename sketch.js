@@ -41,22 +41,25 @@ class Block {
 // DFS + backtracking to try to visit as many road cells as possible
 class RoadGrid {
   constructor(isRoadCell, gridCellToBlockIndex, gridRows, gridCols, coloredBlocks) {
+    // 2D boolean grid: true = this cell is a road
     this.isRoadCell = isRoadCell;
+    // 2D grid that maps (row, col) -> index in coloredBlocks array
     this.gridCellToBlockIndex = gridCellToBlockIndex;
     this.gridRows = gridRows;
     this.gridCols = gridCols;
+    // list of all V1 colored Block objects
     this.coloredBlocks = coloredBlocks;
 
     // directions for DFS: right, down, left, up
     this.directions = [
-      { rowChange: 0, colChange: 1 },  // right
-      { rowChange: 1, colChange: 0 },  // down
+      { rowChange: 0, colChange: 1 }, // right
+      { rowChange: 1, colChange: 0 }, // down
       { rowChange: 0, colChange: -1 }, // left
-      { rowChange: -1, colChange: 0 }  // up
+      { rowChange: -1, colChange: 0 } // up
     ];
   }
 
-  // check inside grid
+  // check if a grid coordinate is inside the valid range
   isInside(row, col) {
     return (
       row >= 0 && row < this.gridRows &&
@@ -64,12 +67,12 @@ class RoadGrid {
     );
   }
 
-  // check if this cell is a road
+  // check if this cell is a road cell
   isRoad(row, col) {
     return this.isInside(row, col) && this.isRoadCell[row][col];
   }
 
-  // how many road neighbors a cell has
+  // count how many road neighbors this cell has
   functionRoadDegree(row, col) {
     let count = 0;
     for (let d of this.directions) {
@@ -82,7 +85,7 @@ class RoadGrid {
     return count;
   }
 
-  // convert grid coord to Block object
+  // convert a grid coordinate into the corresponding Block object
   coordToBlock(row, col) {
     const idx = this.gridCellToBlockIndex[row][col];
     if (idx !== null && idx !== undefined) {
@@ -91,32 +94,35 @@ class RoadGrid {
     return null;
   }
 
-  // build a continuous path through the road network
-  // This returns an ordered list of Block objects for the animation.
+  // Build one continuous path through the road network.
+  // DFS reference idea: https://en.wikipedia.org/wiki/Depth-first_search
   buildAnimationPath() {
     let revealPathBlocks = [];
 
+    // safety check: if grid is empty, return empty path
     if (!this.isRoadCell || this.gridRows === 0 || this.gridCols === 0) {
       return revealPathBlocks;
     }
 
-    // choose start cell
+    // -------- choose a start cell for DFS --------
     let start = null;
     for (let r = 0; r < this.gridRows; r++) {
       for (let c = 0; c < this.gridCols; c++) {
+        // prefer a road cell on a "dead end" (degree == 1)
         if (this.isRoadCell[r][c] && this.functionRoadDegree(r, c) === 1) {
           start = { row: r, col: c };
           break;
         }
+        // if we still do not have a start, use the first road cell we find
         if (!start && this.isRoadCell[r][c]) {
           start = { row: r, col: c };
         }
       }
       if (start) break;
     }
-    if (!start) return revealPathBlocks;
+    if (!start) return revealPathBlocks; // no road at all
 
-    // visited flags
+    // -------- visited flags for DFS --------
     let visited = [];
     for (let r = 0; r < this.gridRows; r++) {
       visited[r] = [];
@@ -125,20 +131,25 @@ class RoadGrid {
       }
     }
 
+    // bestPathCoords will store the longest path we have found so far
     let bestPathCoords = [];
+    // currentPath stores the path we are currently exploring in DFS
     let currentPath = [];
 
     const self = this;
 
-    // DFS + backtracking to try to visit as many road cells as possible
+    // DFS with backtracking, visit as many connected road cells as possible in one chain
     function dfs(row, col) {
+      // mark current cell as visited and add to current path
       visited[row][col] = true;
       currentPath.push({ row, col });
 
+      // if current path is longer than the best so far, keep a copy
       if (currentPath.length > bestPathCoords.length) {
-        bestPathCoords = currentPath.slice();
+        bestPathCoords = currentPath.slice(); // slice() = shallow copy
       }
 
+      // collect all unvisited road neighbors
       let neighbors = [];
       for (let d of self.directions) {
         const nextRow = row + d.rowChange;
@@ -152,24 +163,28 @@ class RoadGrid {
         }
       }
 
-      // heuristic: go to tighter corridors first
+   
+      // visit cells that have fewer neighbors first, this tends to makes the path longer
       neighbors.sort(function (a, b) {
         const da = self.functionRoadDegree(a.row, a.col);
         const db = self.functionRoadDegree(b.row, b.col);
         return da - db;
       });
 
+      // explore each neighbor deeply (DFS)
       for (let n of neighbors) {
         dfs(n.row, n.col);
       }
 
+      // remove current cell from path and mark as unvisited
       currentPath.pop();
       visited[row][col] = false;
     }
 
+    // run DFS from the chosen start cell
     dfs(start.row, start.col);
 
-    // convert coords to Block objects
+    // convert the longest path into Block objects
     revealPathBlocks = [];
     for (let k = 0; k < bestPathCoords.length; k++) {
       const { row, col } = bestPathCoords[k];
@@ -430,23 +445,14 @@ function generateArt() {
       const r = mapImage.pixels[pixelIndex];
       const g = mapImage.pixels[pixelIndex + 1];
       const b = mapImage.pixels[pixelIndex + 2];
-
+      // Check if it's a road pixel (white color)
       if (r > 240 && g > 240 && b > 240) {
         gridV1[row][col] = chooseColorV1(gridV1, row, col); // V1 choose color
 
         const bx = x * scaleX;
         const by = y * scaleY;
-
-        const block = new Block(
-          bx,
-          by,
-          blockSize,
-          blockSize,
-          gridV1[row][col],
-          1.2,
-          'V1',
-          row,
-          col
+        // create a V1 Block for this road cell (colored block)
+        const block = new Block(bx, by, blockSize, blockSize, gridV1[row][col], 1.2, 'V1', row, col
         );
 
         coloredBlocks.push(block);
@@ -485,12 +491,13 @@ function drawSVGBlocks() {
   function R(x, y, w, h, c, dir = 1) {
     const delta = center * MAX_SCALE_RATIO * dir;
     const scaleFactor = 1 + delta;
-
-    const wScaled = w * scaleFactor;
+  
+    const wScaled = w * scaleFactor; // apply scale to width and height
     const hScaled = h * scaleFactor;
-    const dx = (wScaled - w) / 2;
+    const dx = (wScaled - w) / 2; // move the block so it stays roughly centered
     const dy = (hScaled - h) / 2;
-
+    
+    // draw the hand-drawn rectangle in the scaled 600x600 canvas
     feltingRect(
       g,
       Math.round((x - dx) / s),
@@ -498,7 +505,7 @@ function drawSVGBlocks() {
       Math.round(wScaled / s),
       Math.round(hScaled / s),
       c,
-      6 // big blocks -> larger ampScale
+      6 // big blocks = larger ampScale
     );
   }
 

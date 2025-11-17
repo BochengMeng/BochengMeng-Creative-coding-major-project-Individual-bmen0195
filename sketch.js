@@ -669,4 +669,3 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
   g.noFill();
   g.rect(x, y, w, h);
 }
-

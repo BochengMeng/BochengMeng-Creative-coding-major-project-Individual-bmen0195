@@ -301,26 +301,26 @@ function startAnimation() {
 
 function updateAnimation() {
   if (revealPath.length === 0) return;
-
+  // read current audio level from p5.Amplitude (https://p5js.org/reference/p5.sound/p5.Amplitude/)
   let level = 0;
   if (audioAnalyzer) {
     level = audioAnalyzer.getLevel();
   }
-  currentLoudness = level;
+  currentLoudness = level; // store it in a global so other functions (like drawSVGBlocks) can also use it
 
   const silenceThreshold = 0.02; 
   if (currentLoudness < silenceThreshold) {
     return; // stop moving when audio is quiet
   }
-
+  // map the loudness to an extra speed
   let mappedBoost = map(
     currentLoudness, 0, 0.3, 0, audioBoostSpeed, true
   );
-  let currentSpeed = (baseSpeed + mappedBoost) * globalSpeedMultiplier;
+  let currentSpeed = (baseSpeed + mappedBoost) * globalSpeedMultiplier; // combine base speed and audio boost, then apply a global multiplier
 
-  pathPosition += currentSpeed;
+  pathPosition += currentSpeed; // move the "train" position along the path (float index)
   revealedBlockCount = floor(pathPosition);
-
+  // clamp values and stop the animation
   if (revealedBlockCount >= totalPathBlocks - 1) {
     revealedBlockCount = totalPathBlocks - 1;
     pathPosition = totalPathBlocks - 1;

@@ -20,8 +20,8 @@ class Block {
     this.color = color;
     this.ampScale = ampScale;
     this.layer = layer; // 'V1' or 'V2'
-    this.row = row;     // grid row (for path)
-    this.col = col;     // grid col (for path)
+    this.row = row; // grid row (for path)
+    this.col = col; // grid col (for path)
   }
 
   // draw V2 (simple block)
@@ -32,6 +32,153 @@ class Block {
   // draw V1 (hand-drawn wobbly style)
   drawV1(g) {
     feltingRectV1(g, this.x, this.y, this.w, this.h, this.color, this.ampScale);
+  }
+}
+
+// ---------------- RoadGrid class --------------------
+// this class keeps the road grid and build a long path for animation.
+// DFS + backtracking to try to visit as many road cells as possible
+class RoadGrid {
+  constructor(isRoadCell, gridCellToBlockIndex, gridRows, gridCols, coloredBlocks) {
+    this.isRoadCell = isRoadCell;
+    this.gridCellToBlockIndex = gridCellToBlockIndex;
+    this.gridRows = gridRows;
+    this.gridCols = gridCols;
+    this.coloredBlocks = coloredBlocks;
+
+    // directions for DFS: right, down, left, up
+    this.directions = [
+      { rowChange: 0, colChange: 1 }, // right
+      { rowChange: 1, colChange: 0 }, // down
+      { rowChange: 0, colChange: -1 }, // left
+      { rowChange: -1, colChange: 0 }  // up
+    ];
+  }
+
+  // helper: check inside grid
+  isInside(row, col) {
+    return (
+      row >= 0 && row < this.gridRows &&
+      col >= 0 && col < this.gridCols
+    );
+  }
+
+  // helper: check if this cell is a road
+  isRoad(row, col) {
+    return this.isInside(row, col) && this.isRoadCell[row][col];
+  }
+
+  // helper: how many road neighbors a cell has
+  functionRoadDegree(row, col) {
+    let count = 0;
+    for (let d of this.directions) {
+      const nextRow = row + d.rowChange;
+      const nextCol = col + d.colChange;
+      if (this.isRoad(nextRow, nextCol)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
+  // helper: convert grid coord to Block object
+  coordToBlock(row, col) {
+    const idx = this.gridCellToBlockIndex[row][col];
+    if (idx !== null && idx !== undefined) {
+      return this.coloredBlocks[idx];
+    }
+    return null;
+  }
+
+  // build a continuous path through the road network
+  // This returns an ordered list of Block objects for the animation.
+  buildAnimationPath() {
+    let revealPathBlocks = [];
+
+    if (!this.isRoadCell || this.gridRows === 0 || this.gridCols === 0) {
+      return revealPathBlocks;
+    }
+
+    // choose start cell
+    let start = null;
+    for (let r = 0; r < this.gridRows; r++) {
+      for (let c = 0; c < this.gridCols; c++) {
+        if (this.isRoadCell[r][c] && this.functionRoadDegree(r, c) === 1) {
+          start = { row: r, col: c };
+          break;
+        }
+        if (!start && this.isRoadCell[r][c]) {
+          start = { row: r, col: c };
+        }
+      }
+      if (start) break;
+    }
+    if (!start) return revealPathBlocks;
+
+    // visited flags
+    let visited = [];
+    for (let r = 0; r < this.gridRows; r++) {
+      visited[r] = [];
+      for (let c = 0; c < this.gridCols; c++) {
+        visited[r][c] = false;
+      }
+    }
+
+    let bestPathCoords = [];
+    let currentPath = [];
+
+    const self = this;
+
+    // DFS + backtracking to try to visit as many road cells as possible
+    function dfs(row, col) {
+      visited[row][col] = true;
+      currentPath.push({ row, col });
+
+      if (currentPath.length > bestPathCoords.length) {
+        bestPathCoords = currentPath.slice();
+      }
+
+      let neighbors = [];
+      for (let d of self.directions) {
+        const nextRow = row + d.rowChange;
+        const nextCol = col + d.colChange;
+        if (
+          self.isInside(nextRow, nextCol) &&
+          self.isRoadCell[nextRow][nextCol] &&
+          !visited[nextRow][nextCol]
+        ) {
+          neighbors.push({ row: nextRow, col: nextCol });
+        }
+      }
+
+      // heuristic: go to tighter corridors first
+      neighbors.sort(function (a, b) {
+        const da = self.functionRoadDegree(a.row, a.col);
+        const db = self.functionRoadDegree(b.row, b.col);
+        return da - db;
+      });
+
+      for (let n of neighbors) {
+        dfs(n.row, n.col);
+      }
+
+      currentPath.pop();
+      visited[row][col] = false;
+    }
+
+    dfs(start.row, start.col);
+
+    // convert coords to Block objects
+    revealPathBlocks = [];
+    for (let k = 0; k < bestPathCoords.length; k++) {
+      const { row, col } = bestPathCoords[k];
+      const block = self.coordToBlock(row, col);
+      if (block) {
+        revealPathBlocks.push(block);
+      }
+    }
+
+    return revealPathBlocks;
   }
 }
 
@@ -292,114 +439,15 @@ function generateArt() {
   }
 
   // build a continuous path through the road network
-  buildAnimationPath();
-  totalPathBlocks = revealPath.length;
-}
-
-// DFS + backtracking to try to visit as many road cells as possible
-function buildAnimationPath() {
-  revealPath = [];
-  if (!isRoadCell || gridRows === 0 || gridCols === 0) return;
-
-  const directions = [
-    { rowChange: 0, colChange: 1 }, // right
-    { rowChange: 1, colChange: 0 }, // down
-    { rowChange: 0, colChange: -1 }, // left
-    { rowChange: -1, colChange: 0 }  // up
-  ];
-
-  function roadDegree(row, col) {
-    let count = 0;
-    for (let d of directions) {
-      const nextRow = row + d.rowChange;
-      const nextCol = col + d.colChange;
-      if (
-        nextRow >= 0 && nextRow < gridRows &&
-        nextCol >= 0 && nextCol < gridCols &&
-        isRoadCell[nextRow][nextCol]
-      ) {
-        count++;
-      }
-    }
-    return count;
-  }
-
-  // choose start cell
-  let start = null;
-  for (let r = 0; r < gridRows; r++) {
-    for (let c = 0; c < gridCols; c++) {
-      if (isRoadCell[r][c] && roadDegree(r, c) === 1) {
-        start = { row: r, col: c };
-        break;
-      }
-      if (!start && isRoadCell[r][c]) {
-        start = { row: r, col: c };
-      }
-    }
-    if (start) break;
-  }
-  if (!start) return;
-
-  // visited flags
-  let visited = [];
-  for (let r = 0; r < gridRows; r++) {
-    visited[r] = [];
-    for (let c = 0; c < gridCols; c++) {
-      visited[r][c] = false;
-    }
-  }
-
-  let bestPathCoords = [];
-  let currentPath = [];
-
-  function dfs(row, col) {
-    visited[row][col] = true;
-    currentPath.push({ row, col });
-
-    if (currentPath.length > bestPathCoords.length) {
-      bestPathCoords = currentPath.slice();
-    }
-
-    let neighbors = [];
-    for (let d of directions) {
-      const nextRow = row + d.rowChange;
-      const nextCol = col + d.colChange;
-      if (
-        nextRow >= 0 && nextRow < gridRows &&
-        nextCol >= 0 && nextCol < gridCols &&
-        isRoadCell[nextRow][nextCol] &&
-        !visited[nextRow][nextCol]
-      ) {
-        neighbors.push({ row: nextRow, col: nextCol });
-      }
-    }
-
-    // heuristic: go to tighter corridors first
-    neighbors.sort(function (a, b) {
-      const da = roadDegree(a.row, a.col);
-      const db = roadDegree(b.row, b.col);
-      return da - db;
-    });
-
-    for (let n of neighbors) {
-      dfs(n.row, n.col);
-    }
-
-    currentPath.pop();
-    visited[row][col] = false;
-  }
-
-  dfs(start.row, start.col);
-
-  // convert coords to Block objects
-  revealPath = [];
-  for (let k = 0; k < bestPathCoords.length; k++) {
-    const { row, col } = bestPathCoords[k];
-    const idx = gridCellToBlockIndex[row][col];
-    if (idx !== null && idx !== undefined) {
-      revealPath.push(coloredBlocks[idx]);
-    }
-  }
+  const roadGrid = new RoadGrid(
+    isRoadCell,
+    gridCellToBlockIndex,
+    gridRows,
+    gridCols,
+    coloredBlocks
+  );
+  // DFS + backtracking to try to visit as many road cells as possible
+  revealPath = roadGrid.buildAnimationPath();
   totalPathBlocks = revealPath.length;
 }
 

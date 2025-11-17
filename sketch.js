@@ -24,12 +24,10 @@ class Block {
     this.row = row; // grid row (for path)
     this.col = col; // grid col (for path)
   }
-
   // draw V2 (simple block)
   drawV2(g) {
     feltingRect(g, this.x, this.y, this.w, this.h, this.color, this.ampScale);
   }
-
   // draw V1 (hand-drawn wobbly style)
   drawV1(g) {
     feltingRectV1(g, this.x, this.y, this.w, this.h, this.color, this.ampScale);
@@ -200,7 +198,6 @@ class RoadGrid {
         revealPathBlocks.push(block);
       }
     }
-
     return revealPathBlocks;
   }
 }
@@ -236,9 +233,9 @@ function preload() {
 }
 
 function setup() {
-  // canvas size follows the window; we will draw a fixed 1920x1080 "wall" inside it
+  // canvas size follows the window, draw a fixed 1920x1080 "wall" inside it
   createCanvas(windowWidth, windowHeight);
-  pixelDensity(1);
+  pixelDensity(1); // https://p5js.org/reference/p5/pixelDensity/
 
   //Content outside the element box is not shown https://www.w3schools.com/jsref/prop_style_overflow.asp
   document.body.style.overflow = 'hidden';
@@ -248,21 +245,19 @@ function setup() {
   mondrianCanvas.pixelDensity(1); // https://p5js.org/reference/p5/pixelDensity/
 
   // init audio amplitude
-  audioAnalyzer = new p5.Amplitude();
+  audioAnalyzer = new p5.Amplitude(); //https://p5js.org/reference/p5.sound/p5.Amplitude/
   audioAnalyzer.setInput(backgroundMusic);
-
   generateArt();
   isReady = true;
 }
 
 function draw() {
-  // Responsive scaling:.
+  // Responsive scaling.
   const s = Math.max(width / DESIGN_W, height / DESIGN_H);
   const offsetX = (width - DESIGN_W * s) / 2;
   const offsetY = (height - DESIGN_H * s) / 2;
 
   background(255);
-
   push();
   translate(offsetX, offsetY);
   scale(s);
@@ -283,12 +278,10 @@ function draw() {
     if (isAnimating) {
       updateAnimation();
     }
-
     // redraw mondrianCanvas based on current revealedBlockCount
     renderArt();
     image(mondrianCanvas, 656, 152, 600, 600);
   }
-
   pop(); // end zoom
   pop(); // end responsive scaling
 }
@@ -306,12 +299,10 @@ function windowResized() {
 // reset and start the reveal
 function startAnimation() {
   if (revealPath.length === 0) return;
-
   isAnimating = true;
   revealedBlockCount = 0;
   totalPathBlocks = revealPath.length;
   pathPosition = 0; // start at the beginning of the path
-
   if (backgroundMusic) {
     if (backgroundMusic.isPlaying()) {
       backgroundMusic.stop();
@@ -329,7 +320,6 @@ function updateAnimation() {
     level = audioAnalyzer.getLevel();
   }
   currentLoudness = level; // store it in a global so other functions (like drawSVGBlocks) can also use it
-
   const silenceThreshold = 0.02; 
   if (currentLoudness < silenceThreshold) {
     return; // stop moving when audio is quiet
@@ -372,7 +362,6 @@ function renderArt() {
     const block = revealPath[i];
     block.drawV1(mondrianCanvas);
   }
-
   mondrianCanvas.pop();
 }
 
@@ -381,11 +370,7 @@ const BLACK_COLOR = '#000000ff';
 
 // V1 colored lines
 let mondrianColors = {
-  gray: '#d6d7d2',
-  yellow: '#e1c927',
-  red: '#ad372b',
-  blue: '#314294',
-  bg: '#EBEAE6'
+  gray: '#d6d7d2', yellow: '#e1c927', red: '#ad372b', blue: '#314294', bg: '#EBEAE6'
 };
 
 // prepare all V2 and V1 blocks (store as Block data, not directly draw)
@@ -415,20 +400,17 @@ function generateArt() {
     return Array(cols).fill(false);
   });
 
-  // V2 sampling - all blocks are black
+  // V2 sampling, all blocks are black
   for (let y = 0, row = 0; y < mapImage.height; y += GRID_SPACING, row++) {
     for (let x = 0, col = 0; x < mapImage.width; x += GRID_SPACING, col++) {
       const pixelIndex = (y * mapImage.width + x) * 4;
       const r = mapImage.pixels[pixelIndex];
       const g = mapImage.pixels[pixelIndex + 1];
       const b = mapImage.pixels[pixelIndex + 2];
-
       if (r > 240 && g > 240 && b > 240) {
         isRoadCell[row][col] = true; // mark as road for path
-
         const bx = x * scaleX;
         const by = y * scaleY;
-
         blackBlocks.push(
           new Block(bx, by, blockSize, blockSize, BLACK_COLOR, 1.2, 'V2')
         );
@@ -519,36 +501,17 @@ function drawSVGBlocks() {
   // 1: louder audio = bigger block
   // -1: louder audio = smaller block (inverse reaction)
   // 0：no move
-  R(910, 305, 275, 420, '#4267ba', 0);
-  R(910, 390, 275, 230, '#ad372b', 0);
-  R(960, 450, 160, 100, '#e1c927', 1);
-  R(80, 1160, 160, 140, '#e1c927', -1);
-  R(230, 960, 150, 130, "#4267ba", 0);
-  R(1450, 1450, 165, 165, '#e1c927', 1);
-  R(730, 280, 95, 95, '#e1c927', -1);
-  R(385, 1300, 195, 310, '#ad372b', 0);
-  R(450, 1360, 60, 60, '#d6d7d2', -1);
-  R(1005, 1060, 175, 390, "#4267ba", 0);
-  R(1025, 1295, 125, 100, '#e1c927', -1);
-  R(150, 455, 225, 120, "#4267ba", 0);
-  R(280, 160, 205, 85, '#ad372b', 0);
-  R(1380, 70, 180, 120, "#4267ba", 0);
-  R(1400, 625, 210, 210, '#ad372b', 0);
-  R(1270, 865, 130, 190, '#e1c927', 1);
-  R(610, 945, 215, 215, '#e1c927',  -1);
-  R(385, 740, 220, 90, '#ad372b', 0);
-  R(830, 730, 155, 155, '#ad372b', 0);
-  R(1470, 700, 80, 60, '#d6d7d2', 1);
-  R(280, 1000, 50, 50, '#d6d7d2', -1);
-  R(670, 1020, 80, 80, '#d6d7d2', 1);
-  R(340, 160, 40, 85, '#d6d7d2', -1);
-  R(1295, 915, 75, 75, '#d6d7d2', 1);
+  R(910, 305, 275, 420, '#4267ba', 0); R(910, 390, 275, 230, '#ad372b', 0); R(960, 450, 160, 100, '#e1c927', 1); R(80, 1160, 160, 140, '#e1c927', -1);
+  R(230, 960, 150, 130, "#4267ba", 0); R(1450, 1450, 165, 165, '#e1c927', 1); R(730, 280, 95, 95, '#e1c927', -1); R(385, 1300, 195, 310, '#ad372b', 0);
+  R(450, 1360, 60, 60, '#d6d7d2', -1); R(1005, 1060, 175, 390, "#4267ba", 0); R(1025, 1295, 125, 100, '#e1c927', -1); R(150, 455, 225, 120, "#4267ba", 0);
+  R(280, 160, 205, 85, '#ad372b', 0); R(1380, 70, 180, 120, "#4267ba", 0); R(1400, 625, 210, 210, '#ad372b', 0); R(1270, 865, 130, 190, '#e1c927', 1);
+  R(610, 945, 215, 215, '#e1c927',  -1); R(385, 740, 220, 90, '#ad372b', 0); R(830, 730, 155, 155, '#ad372b', 0); R(1470, 700, 80, 60, '#d6d7d2', 1);
+  R(280, 1000, 50, 50, '#d6d7d2', -1); R(670, 1020, 80, 80, '#d6d7d2', 1); R(340, 160, 40, 85, '#d6d7d2', -1); R(1295, 915, 75, 75, '#d6d7d2', 1);
 }
 
 // (V1) choose color with probability and neighbor checking （like in mondian's work）
 function chooseColorV1(grid, row, col) {
   const avoid = [];
-
   // Check top neighbor
   if (row > 0 && grid[row - 1][col] && grid[row - 1][col] !== mondrianColors.yellow) {
     avoid.push(grid[row - 1][col]);
@@ -571,7 +534,6 @@ function chooseColorV1(grid, row, col) {
   });
   // if no color left (all were avoided), fall back to yellow as default
   if (available.length === 0) return mondrianColors.yellow;
-
   const total = available.reduce(function (sum, w) {
     return sum + w.weight;
   }, 0);
@@ -590,26 +552,16 @@ function chooseColorV1(grid, row, col) {
 // Background space drawing function - simplified without shadows
 function drawBackground() {
   noStroke();
-
   // wall
   fill('#F5F4F0'); 
   rect(0, 2, DESIGN_W, 910);
-
   // floor line
   fill('#6C4D38'); 
   rect(0, 868, DESIGN_W, 8);
-
   // floor strips
-  fill('#A88974'); rect(0, 875, DESIGN_W, 8);
-  fill('#DBBDA5'); rect(0, 883, DESIGN_W, 12);
-  fill('#CEB1A1'); rect(0, 895, DESIGN_W, 20);
-  fill('#DDC3AC'); rect(0, 915, DESIGN_W, 30);
-
+  fill('#A88974'); rect(0, 875, DESIGN_W, 8); fill('#DBBDA5'); rect(0, 883, DESIGN_W, 12); fill('#CEB1A1'); rect(0, 895, DESIGN_W, 20); fill('#DDC3AC'); rect(0, 915, DESIGN_W, 30);
   // static frame layers
-  fill('#A88974'); rect(630, 132, 670, 677);
-  fill('#E1E0DC'); rect(620, 120, 666, 664);
-  fill('#BFA89A'); rect(658, 153, 606, 622);
-  fill('#A88974'); rect(658, 153, 604, 612);
+  fill('#A88974'); rect(630, 132, 670, 677); fill('#E1E0DC'); rect(620, 120, 666, 664); fill('#BFA89A'); rect(658, 153, 606, 622); fill('#A88974'); rect(658, 153, 604, 612);
 }
 
 // ------------------(V2) Hand-drawn style in visuals---------------------------
@@ -645,7 +597,6 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
       const offset = map(n, 0, 1, -wobbleAmount, wobbleAmount);
       g.vertex(x + i * w, constrain(y + offset, y - wobbleAmount, y + wobbleAmount));
     }
-
     // right
     for (let i = 0; i <= 1; i += 0.02) {
       const n = noise((x + w + l * 20) * noiseFrequency, (y + i * h) * noiseFrequency);
@@ -655,7 +606,6 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
         y + i * h
       );
     }
-
     // down
     for (let i = 1; i >= 0; i -= 0.02) {
       const n = noise((x + i * w) * noiseFrequency, (y + h + l * 40) * noiseFrequency);
@@ -665,7 +615,6 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
         constrain(y + h + offset, y + h - wobbleAmount, y + h + wobbleAmount)
       );
     }
-
     // left
     for (let i = 1; i >= 0; i -= 0.02) {
       const n = noise((x + l * 30) * noiseFrequency, (y + i * h) * noiseFrequency);
@@ -677,7 +626,6 @@ function feltingRectV1(g, x, y, w, h, c, ampScale = 1) {
     }
     g.endShape(CLOSE);
   }
-
   g.stroke(red(c), green(c), blue(c), 40);
   g.strokeWeight(3);
   g.noFill();

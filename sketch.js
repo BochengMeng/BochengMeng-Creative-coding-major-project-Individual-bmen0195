@@ -544,25 +544,26 @@ function chooseColorV1(grid, row, col) {
   if (col > 0 && grid[row][col - 1] && grid[row][col - 1] !== mondrianColors.yellow) {
     avoid.push(grid[row][col - 1]);
   }
-
+  // each color has a weight
   const weights = [
     { color: mondrianColors.gray, weight: 15 },
     { color: mondrianColors.yellow, weight: 45 },
     { color: mondrianColors.red, weight: 20 },
     { color: mondrianColors.blue, weight: 20 }
   ];
-
+  // remove colors that we want to avoid (for example: same as neighbor)
   const available = weights.filter(function (w) {
     return !avoid.includes(w.color);
   });
-
+  // if no color left (all were avoided), fall back to yellow as default
   if (available.length === 0) return mondrianColors.yellow;
 
   const total = available.reduce(function (sum, w) {
     return sum + w.weight;
   }, 0);
-
+  // pick a random number from 0 to total
   let rand = random(total);
+  // walk through the available list and find which color matches this random number
   for (let i = 0; i < available.length; i++) {
     if (rand < available[i].weight) {
       return available[i].color;
